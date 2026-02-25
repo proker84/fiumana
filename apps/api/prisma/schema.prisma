@@ -111,6 +111,9 @@ model Property {
   sleeps       Int?
   isFeatured   Boolean         @default(false)
   icalUrl      String?         // Airbnb iCal URL for sync
+  airbnbId     String?         @unique // Airbnb listing ID
+  airbnbUrl    String?         // Original Airbnb URL
+  cin          String?         // Codice Identificativo Nazionale
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 

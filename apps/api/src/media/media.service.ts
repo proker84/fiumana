@@ -57,6 +57,32 @@ export class MediaService {
     return this.uploadLocally(file, folder);
   }
 
+  async uploadFromUrl(imageUrl: string, folder: string = 'imported'): Promise<string> {
+    if (this.isCloudinaryConfigured) {
+      const result = await cloudinary.uploader.upload(imageUrl, {
+        folder: `immobiliare-fiumana/${folder}`,
+        resource_type: 'image',
+      });
+      return result.secure_url;
+    }
+
+    // Fallback: download and save locally
+    const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error('Failed to download image');
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const folderPath = join(this.uploadDir, folder);
+    if (!existsSync(folderPath)) {
+      mkdirSync(folderPath, { recursive: true });
+    }
+
+    const filename = `${Date.now()}-imported.jpg`;
+    const filePath = join(folderPath, filename);
+    writeFileSync(filePath, buffer);
+
+    return `/uploads/${folder}/${filename}`;
+  }
+
   async deleteImage(url: string): Promise<void> {
     if (!url) return;
 

@@ -17,6 +17,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { CheckinModule } from './checkin/checkin.module';
 import { AlloggiatiModule } from './alloggiati/alloggiati.module';
 import { PaymentsModule } from './payments/payments.module';
+import { AirbnbImportModule } from './airbnb-import/airbnb-import.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { PaymentsModule } from './payments/payments.module';
     CheckinModule,
     AlloggiatiModule,
     PaymentsModule,
+    AirbnbImportModule,
   ],
   providers: [
     {
