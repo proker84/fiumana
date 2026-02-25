@@ -17,5 +17,6 @@
       "@shared/*": ["../../packages/shared/src/*"]
     }
   },
-  "include": ["src", "prisma", "../../packages/shared/src"]
+  "include": ["src"],
+  "exclude": ["prisma", "node_modules", "dist"]
 }
