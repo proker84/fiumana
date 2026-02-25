@@ -189,28 +189,14 @@ export class AirbnbImportService {
       },
     });
 
-    // Import photos - try Cloudinary first, fallback to original Airbnb URL
+    // Import photos - use original Airbnb URLs directly
+    // (Cloudinary upload can be enabled later by setting CLOUDINARY env vars)
     const mediaPromises = listingData.photos.slice(0, 10).map(async (photoUrl, index) => {
-      let finalUrl = photoUrl; // Default to original Airbnb URL
-
-      try {
-        // Try to upload to Cloudinary
-        const uploadedUrl = await this.mediaService.uploadFromUrl(photoUrl, `property_${property.id}`);
-        // Only use Cloudinary URLs, NOT local /uploads/ paths (which don't persist on Railway)
-        if (!uploadedUrl.startsWith('/uploads/')) {
-          finalUrl = uploadedUrl;
-        } else {
-          console.log(`Photo ${index + 1}: Using original Airbnb URL (Cloudinary not configured)`);
-        }
-      } catch (e) {
-        // Keep original Airbnb URL on error
-        console.log(`Photo ${index + 1}: Using original Airbnb URL (upload failed)`);
-      }
-
+      // Use original Airbnb URL directly - they are publicly accessible
       return this.prisma.propertyMedia.create({
         data: {
           propertyId: property.id,
-          url: finalUrl,
+          url: photoUrl,
           type: 'IMAGE',
           alt: `${listingData.title} - Foto ${index + 1}`,
         },
