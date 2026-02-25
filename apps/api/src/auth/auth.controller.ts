@@ -47,7 +47,7 @@ export class AuthController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('ADMIN')
   @UsePipes(new ZodValidationPipe(CreateUserSchema))
-  async createUser(@Body() body: z.infer<typeof CreateUserSchema>) {
+  async createUser(@Body() body: { email: string; password: string; name: string; role: string; phone?: string }) {
     return this.auth.createUser(body);
   }
 
