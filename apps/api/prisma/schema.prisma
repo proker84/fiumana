@@ -1,0 +1,354 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum PropertyType {
+  RESIDENTIAL
+  COMMERCIAL
+  VACATION
+}
+
+enum ContractType {
+  LONG_TERM
+  SHORT_TERM
+}
+
+enum LeadSource {
+  CONTACT
+  OWNER
+  VALUATION
+}
+
+enum UserRole {
+  ADMIN
+  CLEANER
+  GUEST
+}
+
+enum BookingSource {
+  AIRBNB
+  BOOKING
+  DIRECT
+  OTHER
+}
+
+enum CleaningStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum CleaningPhase {
+  PRE_CLEANING
+  POST_CLEANING
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+}
+
+enum PhotoType {
+  BEFORE
+  AFTER
+}
+
+enum StockCategory {
+  BIANCHERIA
+  PULIZIA
+  BAGNO
+  CUCINA
+  ALTRO
+}
+
+enum FaqCategory {
+  CHECKIN
+  CHECKOUT
+  WIFI
+  PARKING
+  AMENITIES
+  RULES
+  EMERGENCY
+  OTHER
+}
+
+// User model with roles
+model User {
+  id           String      @id @default(uuid())
+  email        String      @unique
+  passwordHash String
+  name         String
+  role         UserRole    @default(ADMIN)
+  phone        String?
+  refreshToken String?     @db.Text
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relations
+  cleanings    Cleaning[]  @relation("CleanerCleanings")
+  bookings     Booking[]   @relation("GuestBookings")
+  stockMovements StockMovement[]
+}
+
+// Property model extended
+model Property {
+  id           String          @id @default(uuid())
+  title        String
+  description  String
+  type         PropertyType
+  contractType ContractType
+  price        Float
+  areaSqm      Float?
+  bedrooms     Int?
+  bathrooms    Int?
+  sleeps       Int?
+  isFeatured   Boolean         @default(false)
+  icalUrl      String?         // Airbnb iCal URL for sync
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  // Relations
+  location     Location?
+  media        PropertyMedia[]
+  amenities    Amenity[]       @relation("PropertyAmenities")
+  availability Availability[]
+  bookings     Booking[]
+  cleanings    Cleaning[]
+  stockItems   StockItem[]
+  faqs         FaqItem[]
+}
+
+model PropertyMedia {
+  id         String   @id @default(uuid())
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId String
+  url        String
+  type       String
+  alt        String?
+  createdAt  DateTime @default(now())
+}
+
+model Location {
+  id         String    @id @default(uuid())
+  address    String
+  city       String
+  province   String
+  country    String
+  lat        Float?
+  lng        Float?
+  propertyId String?   @unique
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+model Amenity {
+  id         String     @id @default(uuid())
+  name       String     @unique
+  properties Property[] @relation("PropertyAmenities")
+}
+
+model Availability {
+  id           String       @id @default(uuid())
+  property     Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId   String
+  startDate    DateTime
+  endDate      DateTime
+  nightlyPrice Float?
+  status       String       @default("AVAILABLE")
+  contractType ContractType
+  createdAt    DateTime     @default(now())
+}
+
+// Booking model for reservations
+model Booking {
+  id               String        @id @default(uuid())
+  property         Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId       String
+  guest            User?         @relation("GuestBookings", fields: [guestId], references: [id])
+  guestId          String?
+  externalId       String?       @unique // Airbnb/Booking reservation ID
+  source           BookingSource @default(DIRECT)
+  checkInDate      DateTime
+  checkOutDate     DateTime
+  guestCount       Int           @default(1)
+  guestName        String
+  guestEmail       String?
+  guestPhone       String?
+  checkInCompleted Boolean       @default(false)
+  alloggiatiSent   Boolean       @default(false)
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relations
+  cleaning         Cleaning?
+  checkInData      CheckInData?
+
+  @@index([propertyId])
+  @@index([checkInDate])
+  @@index([checkOutDate])
+}
+
+// Cleaning model for housekeeping
+model Cleaning {
+  id            String         @id @default(uuid())
+  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId    String
+  booking       Booking?       @relation(fields: [bookingId], references: [id])
+  bookingId     String?        @unique
+  cleaner       User?          @relation("CleanerCleanings", fields: [cleanerId], references: [id])
+  cleanerId     String?
+  scheduledDate DateTime
+  status        CleaningStatus @default(PENDING)
+  phase         CleaningPhase  @default(POST_CLEANING)
+  paymentStatus PaymentStatus  @default(PENDING)
+  paymentAmount Float          @default(50) // Default voucher amount
+  notes         String?
+  completedAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relations
+  photos        CleaningPhoto[]
+  checklist     CleaningChecklistItem[]
+
+  @@index([propertyId])
+  @@index([cleanerId])
+  @@index([scheduledDate])
+  @@index([status])
+}
+
+model CleaningPhoto {
+  id         String    @id @default(uuid())
+  cleaning   Cleaning  @relation(fields: [cleaningId], references: [id], onDelete: Cascade)
+  cleaningId String
+  url        String
+  type       PhotoType
+  room       String?
+  createdAt  DateTime  @default(now())
+
+  @@index([cleaningId])
+}
+
+model CleaningChecklistItem {
+  id         String   @id @default(uuid())
+  cleaning   Cleaning @relation(fields: [cleaningId], references: [id], onDelete: Cascade)
+  cleaningId String
+  task       String
+  completed  Boolean  @default(false)
+  room       String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([cleaningId])
+}
+
+// Stock management
+model StockItem {
+  id          String        @id @default(uuid())
+  property    Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId  String
+  category    StockCategory
+  name        String
+  quantity    Int           @default(0)
+  minQuantity Int           @default(5)
+  unit        String?       // e.g., "pcs", "sets", "bottles"
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  movements   StockMovement[]
+
+  @@unique([propertyId, name])
+  @@index([propertyId])
+  @@index([category])
+}
+
+model StockMovement {
+  id             String    @id @default(uuid())
+  stockItem      StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  stockItemId    String
+  quantityChange Int       // Positive for additions, negative for removals
+  reason         String
+  user           User?     @relation(fields: [userId], references: [id])
+  userId         String?
+  createdAt      DateTime  @default(now())
+
+  @@index([stockItemId])
+  @@index([createdAt])
+}
+
+// FAQ items with multimedia support
+model FaqItem {
+  id         String      @id @default(uuid())
+  property   Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId String
+  question   String
+  answer     String      @db.Text
+  category   FaqCategory
+  videoUrl   String?
+  audioUrl   String?
+  imageUrls  String[]    // Array of image URLs
+  sortOrder  Int         @default(0)
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([propertyId])
+  @@index([category])
+}
+
+// Check-in data (encrypted, GDPR compliant)
+model CheckInData {
+  id            String   @id @default(uuid())
+  booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId     String   @unique
+  encryptedData String   @db.Text // AES-256 encrypted JSON
+  expiresAt     DateTime // Auto-delete after 30 days
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([expiresAt])
+}
+
+// Existing models
+model Lead {
+  id           String     @id @default(uuid())
+  name         String
+  email        String
+  phone        String?
+  message      String
+  source       LeadSource
+  city         String?
+  propertyType String?
+  availability String?
+  createdAt    DateTime   @default(now())
+}
+
+model Post {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique
+  excerpt     String
+  content     String
+  coverImage  String?
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PageContent {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  title     String
+  content   String
+  updatedAt DateTime @updatedAt
+}

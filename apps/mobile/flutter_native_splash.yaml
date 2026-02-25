@@ -1,0 +1,18 @@
+flutter_native_splash:
+  # Background color - blu scuro del tema
+  color: "#1a1a2e"
+
+  # Image for splash screen
+  image: assets/icons/splash_icon.png
+
+  # Android 12+ specific
+  android_12:
+    color: "#1a1a2e"
+    image: assets/icons/splash_icon.png
+    icon_background_color: "#1a1a2e"
+
+  # iOS specific
+  ios: true
+
+  # Web (if needed)
+  web: false

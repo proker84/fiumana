@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+:root {
+  --primary-cyan: #4EF1FF;
+  --primary-teal: #22D3EE;
+  --dark-background: #0F172A;
+  --dark-surface: #1E293B;
+  --dark-card: #334155;
+}
+
+@theme inline {
+  --color-background: var(--dark-background);
+  --color-foreground: #ffffff;
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-space-grotesk);
+}
+
+body {
+  background: var(--dark-background);
+  color: #ffffff;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-display), system-ui, sans-serif;
+}
+
+/* Custom form styling */
+input, select, textarea {
+  @apply bg-slate-800 border-slate-700 text-white placeholder-slate-400;
+}
+
+input:focus, select:focus, textarea:focus {
+  @apply border-cyan-400 ring-1 ring-cyan-400 outline-none;
+}
+
+/* Glassmorphism card */
+.glass-card {
+  @apply bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl;
+}
+
+/* Gradient text */
+.gradient-text {
+  @apply bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent;
+}
+
+/* Primary button */
+.btn-primary {
+  @apply bg-gradient-to-r from-cyan-400 to-teal-500 text-slate-900 font-semibold py-3 px-6 rounded-xl hover:from-cyan-300 hover:to-teal-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+/* Secondary button */
+.btn-secondary {
+  @apply border border-cyan-400 text-cyan-400 font-semibold py-3 px-6 rounded-xl hover:bg-cyan-400/10 transition-all duration-200;
+}
+
+/* Progress steps */
+.step-indicator {
+  @apply w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all duration-300;
+}
+
+.step-indicator.active {
+  @apply bg-cyan-400 text-slate-900;
+}
+
+.step-indicator.completed {
+  @apply bg-green-500 text-white;
+}
+
+.step-indicator.pending {
+  @apply bg-slate-700 text-slate-400;
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}

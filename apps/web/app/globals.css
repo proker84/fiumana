@@ -1,0 +1,30 @@
+@import 'mapbox-gl/dist/mapbox-gl.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-base text-white antialiased;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hero-glow {
+  background: radial-gradient(circle at 30% 30%, rgba(78,241,255,0.2), transparent 55%),
+    radial-gradient(circle at 70% 20%, rgba(34,211,238,0.15), transparent 50%);
+}
+
+.text-gradient {
+  background: linear-gradient(120deg, #4ef1ff, #22d3ee, #7dd3fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}

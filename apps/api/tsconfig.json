@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "outDir": "dist",
+    "noEmit": false,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "sourceMap": true,
+    "types": ["node", "jest"],
+    "strict": false,
+    "strictPropertyInitialization": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "paths": {
+      "@shared/*": ["../../packages/shared/src/*"]
+    }
+  },
+  "include": ["src", "prisma", "../../packages/shared/src"]
+}
