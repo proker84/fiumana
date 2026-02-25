@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/config/app_theme.dart';
 import '../../data/models/property_model.dart';
 import '../../data/models/cleaner_model.dart';
@@ -140,7 +139,7 @@ class _AdminPropertyDetailScreenState
               end: Alignment.bottomCenter,
               colors: [
                 Colors.transparent,
-                Colors.black.withOpacity(0.7),
+                Colors.black.withValues(alpha: 0.7),
               ],
             ),
           ),
@@ -158,7 +157,7 @@ class _AdminPropertyDetailScreenState
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.pink.withOpacity(0.2),
+              color: Colors.pink.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -180,7 +179,7 @@ class _AdminPropertyDetailScreenState
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: AppTheme.primaryCyan.withOpacity(0.2),
+              color: AppTheme.primaryCyan.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -203,7 +202,7 @@ class _AdminPropertyDetailScreenState
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: AppTheme.primaryCyan.withOpacity(0.2),
+              color: AppTheme.primaryCyan.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.location_on, color: AppTheme.primaryCyan),
@@ -351,7 +350,7 @@ class _AdminPropertyDetailScreenState
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: AppTheme.primaryCyan.withOpacity(0.2),
+            backgroundColor: AppTheme.primaryCyan.withValues(alpha: 0.2),
             child: Text(
               cleaner.name.isNotEmpty ? cleaner.name[0].toUpperCase() : 'C',
               style: const TextStyle(
@@ -409,7 +408,7 @@ class _AdminPropertyDetailScreenState
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.cardBackground,
+      backgroundColor: AppTheme.darkCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -426,7 +425,7 @@ class _AdminPropertyDetailScreenState
             const SizedBox(height: 16),
             ...availableCleaners.map((cleaner) => ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: AppTheme.primaryCyan.withOpacity(0.2),
+                    backgroundColor: AppTheme.primaryCyan.withValues(alpha: 0.2),
                     child: Text(
                       cleaner.name.isNotEmpty ? cleaner.name[0].toUpperCase() : 'C',
                       style: const TextStyle(
@@ -476,7 +475,7 @@ class _AdminPropertyDetailScreenState
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.cardBackground,
+        backgroundColor: AppTheme.darkCard,
         title: const Text('Conferma rimozione'),
         content: Text(
           'Vuoi rimuovere ${cleaner.name} da questa proprietà?',

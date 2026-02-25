@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/network/api_client.dart';
 import '../../data/models/cleaner_model.dart';
+import 'auth_provider.dart';
 
 class CleanersState {
   final List<CleanerModel> cleaners;
@@ -26,16 +26,18 @@ class CleanersState {
   }
 }
 
-class CleanersNotifier extends StateNotifier<CleanersState> {
-  final ApiClient _apiClient;
-
-  CleanersNotifier(this._apiClient) : super(const CleanersState());
+class CleanersNotifier extends Notifier<CleanersState> {
+  @override
+  CleanersState build() {
+    return const CleanersState();
+  }
 
   Future<void> loadCleaners() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final response = await _apiClient.get('/admin/cleaners');
-      final cleaners = (response as List)
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.getCleaners();
+      final cleaners = (response.data as List)
           .map((e) => CleanerModel.fromJson(e as Map<String, dynamic>))
           .toList();
       state = state.copyWith(cleaners: cleaners, isLoading: false);
@@ -46,7 +48,8 @@ class CleanersNotifier extends StateNotifier<CleanersState> {
 
   Future<void> assignCleanerToProperty(String propertyId, String cleanerId) async {
     try {
-      await _apiClient.post('/admin/properties/$propertyId/cleaners/$cleanerId', {});
+      final apiClient = ref.read(apiClientProvider);
+      await apiClient.assignCleanerToProperty(propertyId, cleanerId);
     } catch (e) {
       state = state.copyWith(error: e.toString());
       rethrow;
@@ -55,7 +58,8 @@ class CleanersNotifier extends StateNotifier<CleanersState> {
 
   Future<void> removeCleanerFromProperty(String propertyId, String cleanerId) async {
     try {
-      await _apiClient.delete('/admin/properties/$propertyId/cleaners/$cleanerId');
+      final apiClient = ref.read(apiClientProvider);
+      await apiClient.removeCleanerFromProperty(propertyId, cleanerId);
     } catch (e) {
       state = state.copyWith(error: e.toString());
       rethrow;
@@ -63,7 +67,6 @@ class CleanersNotifier extends StateNotifier<CleanersState> {
   }
 }
 
-final cleanersProvider = StateNotifierProvider<CleanersNotifier, CleanersState>((ref) {
-  final apiClient = ref.watch(apiClientProvider);
-  return CleanersNotifier(apiClient);
-});
+final cleanersProvider = NotifierProvider<CleanersNotifier, CleanersState>(
+  CleanersNotifier.new,
+);
