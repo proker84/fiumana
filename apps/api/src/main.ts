@@ -1,3 +1,9 @@
+// Polyfill crypto for Node.js 18 compatibility with @nestjs/schedule
+import * as crypto from 'crypto';
+if (!(globalThis as any).crypto) {
+  (globalThis as any).crypto = crypto;
+}
+
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
