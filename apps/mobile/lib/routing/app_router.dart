@@ -51,13 +51,15 @@ class AppRoutes {
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
+  final refreshNotifier = GoRouterRefreshStream(ref);
 
   return GoRouter(
     initialLocation: AppRoutes.splash,
     debugLogDiagnostics: true,
-    refreshListenable: GoRouterRefreshStream(ref),
+    refreshListenable: refreshNotifier,
     redirect: (context, state) {
+      // Read auth state inside redirect to get current value
+      final authState = ref.read(authProvider);
       final isLoggedIn = authState.isAuthenticated;
       final isLoggingIn = state.matchedLocation == AppRoutes.login;
       final isSplash = state.matchedLocation == AppRoutes.splash;

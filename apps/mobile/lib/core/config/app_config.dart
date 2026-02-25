@@ -2,7 +2,7 @@ class AppConfig {
   static const String appName = 'Fiumana Immobiliare';
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:3000',
+    defaultValue: 'https://api-production-c77b.up.railway.app/api',
   );
 
   static const Duration tokenRefreshThreshold = Duration(minutes: 5);

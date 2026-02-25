@@ -41,7 +41,7 @@ export class AuthService {
       data: { refreshToken },
     });
 
-    return { accessToken, refreshToken, user: { id: user.id, email: user.email, name: user.name } };
+    return { accessToken, refreshToken, user: { id: user.id, email: user.email, name: user.name, role: user.role } };
   }
 
   async refresh(userId: string, token: string) {
