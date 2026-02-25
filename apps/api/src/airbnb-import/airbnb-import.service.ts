@@ -240,4 +240,37 @@ export class AirbnbImportService {
       },
     };
   }
+
+  async refreshPhotosFromAirbnb(propertyId: string, airbnbUrl: string) {
+    // Fetch fresh data from Airbnb
+    const listingData = await this.fetchListingData(airbnbUrl);
+
+    // Delete existing photos
+    await this.prisma.propertyMedia.deleteMany({
+      where: { propertyId },
+    });
+
+    // Create new photos with original Airbnb URLs
+    const mediaPromises = listingData.photos.slice(0, 10).map((photoUrl, index) => {
+      return this.prisma.propertyMedia.create({
+        data: {
+          propertyId,
+          url: photoUrl,
+          type: 'IMAGE',
+          alt: `${listingData.title} - Foto ${index + 1}`,
+        },
+      });
+    });
+
+    const media = await Promise.all(mediaPromises);
+
+    return {
+      success: true,
+      photosUpdated: media.length,
+      property: await this.prisma.property.findUnique({
+        where: { id: propertyId },
+        include: { media: true },
+      }),
+    };
+  }
 }

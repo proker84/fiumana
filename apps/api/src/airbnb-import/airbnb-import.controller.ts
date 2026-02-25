@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -7,6 +7,11 @@ import { AirbnbImportService } from './airbnb-import.service';
 
 class ImportAirbnbDto {
   url: string;
+}
+
+class RefreshPhotosDto {
+  propertyId: string;
+  airbnbUrl: string;
 }
 
 @ApiTags('Airbnb Import')
@@ -28,5 +33,12 @@ export class AirbnbImportController {
   @ApiOperation({ summary: 'Anteprima dati immobile Airbnb senza importare' })
   async previewAirbnb(@Body() dto: ImportAirbnbDto) {
     return this.airbnbImportService.fetchListingData(dto.url);
+  }
+
+  @Post('refresh-photos')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Aggiorna le foto di una proprietà con quelle originali di Airbnb' })
+  async refreshPhotos(@Body() dto: RefreshPhotosDto) {
+    return this.airbnbImportService.refreshPhotosFromAirbnb(dto.propertyId, dto.airbnbUrl);
   }
 }
