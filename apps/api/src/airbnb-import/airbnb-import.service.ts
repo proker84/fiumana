@@ -189,31 +189,30 @@ export class AirbnbImportService {
       },
     });
 
-    // Import photos
+    // Import photos - try Cloudinary first, fallback to original Airbnb URL
     const mediaPromises = listingData.photos.slice(0, 10).map(async (photoUrl, index) => {
-      try {
-        // Upload to Cloudinary
-        const uploadedUrl = await this.mediaService.uploadFromUrl(photoUrl, `property_${property.id}`);
+      let finalUrl = photoUrl; // Default to original Airbnb URL
 
-        return this.prisma.propertyMedia.create({
-          data: {
-            propertyId: property.id,
-            url: uploadedUrl,
-            type: 'IMAGE',
-            alt: `${listingData.title} - Foto ${index + 1}`,
-          },
-        });
+      try {
+        // Try to upload to Cloudinary
+        const uploadedUrl = await this.mediaService.uploadFromUrl(photoUrl, `property_${property.id}`);
+        // Only use uploaded URL if it's a Cloudinary URL (not local /uploads/)
+        if (uploadedUrl.includes('cloudinary') || uploadedUrl.includes('res.cloudinary')) {
+          finalUrl = uploadedUrl;
+        }
       } catch (e) {
-        // If upload fails, use original URL
-        return this.prisma.propertyMedia.create({
-          data: {
-            propertyId: property.id,
-            url: photoUrl,
-            type: 'IMAGE',
-            alt: `${listingData.title} - Foto ${index + 1}`,
-          },
-        });
+        // Keep original Airbnb URL on error
+        console.log(`Using original Airbnb URL for photo ${index + 1}`);
       }
+
+      return this.prisma.propertyMedia.create({
+        data: {
+          propertyId: property.id,
+          url: finalUrl,
+          type: 'IMAGE',
+          alt: `${listingData.title} - Foto ${index + 1}`,
+        },
+      });
     });
 
     const media = await Promise.all(mediaPromises);
