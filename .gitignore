@@ -50,3 +50,6 @@ coverage/
 key.properties
 google-services.json
 GoogleService-Info.plist
+
+# Credenziali
+CREDENZIALI.md
