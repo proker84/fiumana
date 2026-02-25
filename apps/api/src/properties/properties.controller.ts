@@ -61,4 +61,52 @@ export class PropertiesController {
   async remove(@Param('id') id: string) {
     return this.properties.remove(id);
   }
+
+  // Cleaner assignment endpoints
+  @Get('admin/properties/:id/cleaners')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('ADMIN')
+  async getPropertyWithCleaners(@Param('id') id: string) {
+    return this.properties.getPropertyWithCleaners(id);
+  }
+
+  @Post('admin/properties/:id/cleaners/:cleanerId')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('ADMIN')
+  async assignCleaner(
+    @Param('id') propertyId: string,
+    @Param('cleanerId') cleanerId: string,
+  ) {
+    return this.properties.assignCleanerToProperty(propertyId, cleanerId);
+  }
+
+  @Delete('admin/properties/:id/cleaners/:cleanerId')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('ADMIN')
+  async removeCleaner(
+    @Param('id') propertyId: string,
+    @Param('cleanerId') cleanerId: string,
+  ) {
+    return this.properties.removeCleanerFromProperty(propertyId, cleanerId);
+  }
+
+  @Get('admin/cleaners')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('ADMIN')
+  async getAvailableCleaners() {
+    return this.properties.getAvailableCleaners();
+  }
+
+  // Endpoint for cleaners to get their assigned properties
+  @Get('cleaner/properties')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CLEANER')
+  async getCleanerProperties(@Query('cleanerId') cleanerId: string) {
+    return this.properties.getPropertiesForCleaner(cleanerId);
+  }
 }

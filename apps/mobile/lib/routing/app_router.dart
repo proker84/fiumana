@@ -19,6 +19,8 @@ import '../presentation/guest/guest_checkin_screen.dart';
 import '../presentation/guest/guest_faq_screen.dart';
 import '../presentation/admin/admin_payments_screen.dart';
 import '../presentation/admin/airbnb_import_screen.dart';
+import '../presentation/admin/admin_properties_screen.dart';
+import '../presentation/admin/admin_property_detail_screen.dart';
 
 // Route names
 class AppRoutes {
@@ -291,31 +293,6 @@ class SplashScreen extends StatelessWidget {
 }
 
 // Placeholder screens for admin (to be fully implemented)
-class AdminPropertiesScreen extends StatelessWidget {
-  const AdminPropertiesScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Immobili')),
-      body: const Center(child: Text('Lista immobili - Da implementare')),
-    );
-  }
-}
-
-class AdminPropertyDetailScreen extends StatelessWidget {
-  final String propertyId;
-  const AdminPropertyDetailScreen({super.key, required this.propertyId});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Dettaglio Immobile')),
-      body: Center(child: Text('Immobile: $propertyId')),
-    );
-  }
-}
-
 class AdminCleaningsScreen extends StatelessWidget {
   const AdminCleaningsScreen({super.key});
 

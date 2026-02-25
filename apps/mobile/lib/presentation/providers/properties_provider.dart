@@ -66,7 +66,7 @@ class PropertiesNotifier extends Notifier<PropertiesState> {
 
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.getProperty(id);
+      final response = await apiClient.getPropertyWithCleaners(id);
       final property = PropertyModel.fromJson(response.data as Map<String, dynamic>);
 
       state = state.copyWith(selectedProperty: property, isLoading: false);
@@ -75,6 +75,48 @@ class PropertiesNotifier extends Notifier<PropertiesState> {
         isLoading: false,
         error: 'Errore nel caricamento della proprietà',
       );
+    }
+  }
+
+  Future<void> assignCleaner(String propertyId, String cleanerId) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.assignCleanerToProperty(propertyId, cleanerId);
+      final property = PropertyModel.fromJson(response.data as Map<String, dynamic>);
+
+      // Update selected property with new cleaner assignment
+      state = state.copyWith(selectedProperty: property);
+
+      // Update property in the list
+      final updatedProperties = state.properties.map((p) {
+        if (p.id == propertyId) return property;
+        return p;
+      }).toList();
+      state = state.copyWith(properties: updatedProperties);
+    } catch (e) {
+      state = state.copyWith(error: 'Errore nell\'assegnazione del cleaner');
+      rethrow;
+    }
+  }
+
+  Future<void> removeCleaner(String propertyId, String cleanerId) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.removeCleanerFromProperty(propertyId, cleanerId);
+      final property = PropertyModel.fromJson(response.data as Map<String, dynamic>);
+
+      // Update selected property
+      state = state.copyWith(selectedProperty: property);
+
+      // Update property in the list
+      final updatedProperties = state.properties.map((p) {
+        if (p.id == propertyId) return property;
+        return p;
+      }).toList();
+      state = state.copyWith(properties: updatedProperties);
+    } catch (e) {
+      state = state.copyWith(error: 'Errore nella rimozione del cleaner');
+      rethrow;
     }
   }
 

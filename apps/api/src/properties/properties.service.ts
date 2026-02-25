@@ -153,4 +153,98 @@ export class PropertiesService {
   async remove(id: string) {
     return this.prisma.property.delete({ where: { id } });
   }
+
+  // Cleaner assignment methods
+  async getPropertyWithCleaners(id: string) {
+    return this.prisma.property.findUnique({
+      where: { id },
+      include: {
+        location: true,
+        media: true,
+        amenities: true,
+        assignedCleaners: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+    });
+  }
+
+  async assignCleanerToProperty(propertyId: string, cleanerId: string) {
+    return this.prisma.property.update({
+      where: { id: propertyId },
+      data: {
+        assignedCleaners: {
+          connect: { id: cleanerId },
+        },
+      },
+      include: {
+        assignedCleaners: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+    });
+  }
+
+  async removeCleanerFromProperty(propertyId: string, cleanerId: string) {
+    return this.prisma.property.update({
+      where: { id: propertyId },
+      data: {
+        assignedCleaners: {
+          disconnect: { id: cleanerId },
+        },
+      },
+      include: {
+        assignedCleaners: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+    });
+  }
+
+  async getAvailableCleaners() {
+    return this.prisma.user.findMany({
+      where: { role: 'CLEANER' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        assignedProperties: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+    });
+  }
+
+  async getPropertiesForCleaner(cleanerId: string) {
+    return this.prisma.property.findMany({
+      where: {
+        assignedCleaners: {
+          some: { id: cleanerId },
+        },
+      },
+      include: {
+        location: true,
+        media: true,
+      },
+    });
+  }
 }

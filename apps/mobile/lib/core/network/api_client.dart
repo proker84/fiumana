@@ -220,6 +220,43 @@ class ApiClient {
   Future<Response> importFromAirbnb(String url) {
     return _dio.post('/airbnb-import', data: {'url': url});
   }
+
+  // Cleaner management endpoints
+  Future<Response> getCleaners() {
+    return _dio.get('/admin/cleaners');
+  }
+
+  Future<Response> getPropertyWithCleaners(String propertyId) {
+    return _dio.get('/admin/properties/$propertyId/cleaners');
+  }
+
+  Future<Response> assignCleanerToProperty(String propertyId, String cleanerId) {
+    return _dio.post('/admin/properties/$propertyId/cleaners/$cleanerId', data: {});
+  }
+
+  Future<Response> removeCleanerFromProperty(String propertyId, String cleanerId) {
+    return _dio.delete('/admin/properties/$propertyId/cleaners/$cleanerId');
+  }
+
+  Future<Response> getCleanerProperties(String cleanerId) {
+    return _dio.get('/cleaner/properties', queryParameters: {'cleanerId': cleanerId});
+  }
+
+  // Generic methods
+  Future<dynamic> get(String path, {Map<String, dynamic>? queryParameters}) async {
+    final response = await _dio.get(path, queryParameters: queryParameters);
+    return response.data;
+  }
+
+  Future<dynamic> post(String path, Map<String, dynamic> data) async {
+    final response = await _dio.post(path, data: data);
+    return response.data;
+  }
+
+  Future<dynamic> delete(String path) async {
+    final response = await _dio.delete(path);
+    return response.data;
+  }
 }
 
 class AuthInterceptor extends Interceptor {

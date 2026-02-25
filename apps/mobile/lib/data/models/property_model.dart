@@ -1,3 +1,5 @@
+import 'cleaner_model.dart';
+
 enum PropertyType { residential, commercial, vacation }
 
 enum ContractType { longTerm, shortTerm }
@@ -17,7 +19,11 @@ class PropertyModel {
   final LocationModel? location;
   final List<PropertyMediaModel> media;
   final List<AmenityModel> amenities;
+  final List<CleanerModel> assignedCleaners;
   final String? icalUrl;
+  final String? airbnbId;
+  final String? airbnbUrl;
+  final String? cin;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -36,7 +42,11 @@ class PropertyModel {
     this.location,
     this.media = const [],
     this.amenities = const [],
+    this.assignedCleaners = const [],
     this.icalUrl,
+    this.airbnbId,
+    this.airbnbUrl,
+    this.cin,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -65,7 +75,14 @@ class PropertyModel {
               ?.map((e) => AmenityModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      assignedCleaners: (json['assignedCleaners'] as List<dynamic>?)
+              ?.map((e) => CleanerModel.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
       icalUrl: json['icalUrl'] as String?,
+      airbnbId: json['airbnbId'] as String?,
+      airbnbUrl: json['airbnbUrl'] as String?,
+      cin: json['cin'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );

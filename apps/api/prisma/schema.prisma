@@ -95,6 +95,7 @@ model User {
   cleanings    Cleaning[]  @relation("CleanerCleanings")
   bookings     Booking[]   @relation("GuestBookings")
   stockMovements StockMovement[]
+  assignedProperties Property[] @relation("PropertyCleaners")
 }
 
 // Property model extended
@@ -126,6 +127,7 @@ model Property {
   cleanings    Cleaning[]
   stockItems   StockItem[]
   faqs         FaqItem[]
+  assignedCleaners User[]     @relation("PropertyCleaners")
 }
 
 model PropertyMedia {
