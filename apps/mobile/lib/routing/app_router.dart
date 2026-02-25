@@ -18,6 +18,7 @@ import '../presentation/guest/guest_home_screen.dart';
 import '../presentation/guest/guest_checkin_screen.dart';
 import '../presentation/guest/guest_faq_screen.dart';
 import '../presentation/admin/admin_payments_screen.dart';
+import '../presentation/admin/airbnb_import_screen.dart';
 
 // Route names
 class AppRoutes {
@@ -33,6 +34,7 @@ class AppRoutes {
   static const adminStock = '/admin/stock';
   static const adminBookings = '/admin/bookings';
   static const adminPayments = '/admin/payments';
+  static const adminAirbnbImport = '/admin/airbnb-import';
   static const adminProfile = '/admin/profile';
 
   // Cleaner routes
@@ -149,6 +151,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutes.adminPayments,
             builder: (context, state) => const AdminPaymentsScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.adminAirbnbImport,
+            builder: (context, state) => const AirbnbImportScreen(),
           ),
           GoRoute(
             path: AppRoutes.adminProfile,

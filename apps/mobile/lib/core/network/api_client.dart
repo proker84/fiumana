@@ -211,6 +211,15 @@ class ApiClient {
       if (endDate != null) 'endDate': endDate,
     });
   }
+
+  // Airbnb Import endpoints
+  Future<Response> previewAirbnbListing(String url) {
+    return _dio.post('/airbnb-import/preview', data: {'url': url});
+  }
+
+  Future<Response> importFromAirbnb(String url) {
+    return _dio.post('/airbnb-import', data: {'url': url});
+  }
 }
 
 class AuthInterceptor extends Interceptor {

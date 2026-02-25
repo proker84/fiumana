@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { PropertyType, ContractType } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { MediaService } from '../media/media.service';
 
@@ -118,7 +119,7 @@ export class AirbnbImportService {
     ];
     for (const pattern of amenityPatterns) {
       if (pattern.test(html)) {
-        amenities.push(pattern.source.replace(/[\\-?]/g, ''));
+        amenities.push(pattern.source.replace(/[-\\?]/g, ''));
       }
     }
 
@@ -163,8 +164,8 @@ export class AirbnbImportService {
       data: {
         title: listingData.title,
         description: listingData.description,
-        type: 'APARTMENT',
-        contractType: 'RENT',
+        type: PropertyType.VACATION,
+        contractType: ContractType.SHORT_TERM,
         price: 0, // Da configurare manualmente
         bedrooms: listingData.bedrooms,
         bathrooms: listingData.bathrooms,
