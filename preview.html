@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Immobiliare Fiumana | Gestione Affitti Brevi</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.min.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary-50: #f0f7ff; --primary-100: #e0effe; --primary-200: #bae0fd;
+      --primary-300: #7cc8fb; --primary-400: #36adf6; --primary-500: #0c93e7;
+      --primary-600: #0074c5; --primary-700: #015da0; --primary-800: #064f84;
+      --primary-900: #0b426e; --primary-950: #072a49;
+      --gold-300: #f0c074; --gold-400: #e9a03c; --gold-500: #e48820;
+      --gold-600: #d56d16;
+    }
+    body { font-family: 'Inter', system-ui, sans-serif; color: #1a1a2e; overflow-x: hidden; }
+    .font-display { font-family: 'Playfair Display', Georgia, serif; }
+
+    /* Navbar */
+    .navbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+      background: rgba(255,255,255,0.95); backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+      padding: 0 2rem; height: 72px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .nav-logo-icon { width: 40px; height: 40px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--primary-600), var(--primary-800));
+      display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 18px; }
+    .nav-logo-text { font-family: 'Playfair Display'; font-weight: 700; font-size: 20px; color: var(--primary-900); }
+    .nav-logo-text span { color: var(--gold-500); }
+    .nav-links { display: flex; gap: 32px; align-items: center; }
+    .nav-links a { text-decoration: none; color: #555; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--primary-600); }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px;
+      background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
+      color: white; border-radius: 12px; font-weight: 600; font-size: 15px;
+      text-decoration: none; border: none; cursor: pointer; transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(0, 116, 197, 0.3);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 116, 197, 0.4); }
+
+    /* Hero Section */
+    .hero {
+      position: relative; min-height: 100vh; display: flex; align-items: center;
+      background: linear-gradient(135deg, #072a49 0%, #0b426e 30%, #064f84 60%, #015da0 100%);
+      padding: 120px 2rem 80px; overflow: hidden;
+    }
+    .hero::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(circle at 70% 30%, rgba(228,136,32,0.15) 0%, transparent 60%),
+                  radial-gradient(circle at 30% 70%, rgba(12,147,231,0.1) 0%, transparent 50%);
+    }
+    .hero::after {
+      content: ''; position: absolute; inset: 0; opacity: 0.05;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.3) 1px, transparent 1px);
+      background-size: 30px 30px;
+    }
+    .hero-content { position: relative; z-index: 2; max-width: 1280px; margin: 0 auto; width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+    .hero-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px;
+      background: rgba(228,136,32,0.15); border: 1px solid rgba(228,136,32,0.3); border-radius: 100px;
+      color: var(--gold-300); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 24px; }
+    .hero h1 { font-family: 'Playfair Display'; font-size: 56px; font-weight: 800; color: white; line-height: 1.1; margin-bottom: 24px; }
+    .hero h1 .highlight { color: transparent; background: linear-gradient(to right, var(--gold-300), var(--gold-500));
+      -webkit-background-clip: text; background-clip: text; }
+    .hero p { color: rgba(255,255,255,0.7); font-size: 18px; line-height: 1.7; margin-bottom: 36px; max-width: 520px; }
+    .hero-buttons { display: flex; gap: 16px; flex-wrap: wrap; }
+    .btn-outline { display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px;
+      border: 2px solid rgba(255,255,255,0.3); color: white; border-radius: 12px;
+      font-weight: 600; font-size: 15px; text-decoration: none; transition: all 0.3s; background: transparent; cursor: pointer; }
+    .btn-outline:hover { border-color: white; background: rgba(255,255,255,0.1); }
+
+    .hero-stats { display: flex; gap: 40px; margin-top: 48px; }
+    .stat-item { text-align: left; }
+    .stat-number { font-family: 'Playfair Display'; font-size: 36px; font-weight: 800; color: var(--gold-400); }
+    .stat-label { color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 4px; }
+
+    .hero-visual { position: relative; display: flex; justify-content: center; }
+    .hero-card-main {
+      background: rgba(255,255,255,0.1); backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.15); border-radius: 24px;
+      padding: 32px; width: 380px;
+      animation: float 6s ease-in-out infinite;
+    }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+    .hero-card-main h3 { color: white; font-family: 'Playfair Display'; font-size: 22px; margin-bottom: 16px; }
+    .hero-card-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .hero-card-item:last-child { border-bottom: none; }
+    .hero-card-icon { width: 36px; height: 36px; border-radius: 10px; background: rgba(228,136,32,0.2);
+      display: flex; align-items: center; justify-content: center; color: var(--gold-400); flex-shrink: 0; }
+    .hero-card-text { color: rgba(255,255,255,0.8); font-size: 14px; }
+    .hero-card-text strong { color: white; display: block; font-size: 15px; }
+
+    .floating-badge {
+      position: absolute; background: white; border-radius: 16px; padding: 16px 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 12px;
+      animation: float 5s ease-in-out infinite;
+    }
+    .floating-badge.top-right { top: -20px; right: -30px; animation-delay: -2s; }
+    .floating-badge.bottom-left { bottom: -10px; left: -20px; animation-delay: -3.5s; }
+    .fb-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+    .fb-green { background: #ecfdf5; color: #059669; }
+    .fb-blue { background: #eff6ff; color: #2563eb; }
+    .fb-text { font-size: 13px; color: #999; }
+    .fb-text strong { color: #1a1a2e; display: block; font-size: 15px; }
+
+    /* Sections */
+    .section { padding: 100px 2rem; }
+    .section-header { text-align: center; margin-bottom: 64px; }
+    .section-badge { display: inline-block; padding: 6px 20px; background: var(--primary-50);
+      color: var(--primary-600); border-radius: 100px; font-size: 12px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; }
+    .section-header h2 { font-family: 'Playfair Display'; font-size: 42px; font-weight: 800; color: #0b426e; margin-bottom: 16px; }
+    .section-header p { color: #777; font-size: 17px; max-width: 600px; margin: 0 auto; }
+
+    /* Formula Cards */
+    .formulas-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; max-width: 1200px; margin: 0 auto; }
+    .formula-card {
+      background: white; border-radius: 24px; padding: 40px 32px; position: relative;
+      border: 1px solid #eee; transition: all 0.3s; overflow: hidden;
+    }
+    .formula-card:hover { transform: translateY(-8px); box-shadow: 0 25px 60px rgba(0,0,0,0.1); border-color: transparent; }
+    .formula-card.featured { border-color: var(--gold-400); background: linear-gradient(135deg, #fffbf0, white); }
+    .formula-card.featured::before {
+      content: 'Più Richiesta'; position: absolute; top: 24px; right: -30px;
+      background: linear-gradient(135deg, var(--gold-400), var(--gold-600)); color: white;
+      font-size: 11px; font-weight: 700; padding: 6px 40px; transform: rotate(45deg); text-transform: uppercase;
+    }
+    .formula-icon { width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; }
+    .formula-icon.blue { background: var(--primary-50); color: var(--primary-600); }
+    .formula-icon.gold { background: #fef3e0; color: var(--gold-600); }
+    .formula-icon.green { background: #ecfdf5; color: #059669; }
+    .formula-card h3 { font-family: 'Playfair Display'; font-size: 24px; font-weight: 700; color: #0b426e; margin-bottom: 12px; }
+    .formula-card .desc { color: #777; font-size: 14px; line-height: 1.7; margin-bottom: 24px; }
+    .formula-features { list-style: none; margin-bottom: 32px; }
+    .formula-features li { display: flex; align-items: start; gap: 10px; padding: 8px 0; font-size: 14px; color: #555; }
+    .formula-features li .check { color: #059669; flex-shrink: 0; margin-top: 2px; }
+    .formula-card .btn-primary { width: 100%; justify-content: center; padding: 14px; }
+    .formula-card .btn-primary.gold-btn { background: linear-gradient(135deg, var(--gold-500), var(--gold-600)); box-shadow: 0 4px 15px rgba(228,136,32,0.3); }
+
+    /* Services Strip */
+    .services-section { background: #f8fafc; }
+    .services-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; max-width: 1200px; margin: 0 auto; }
+    .service-card {
+      background: white; border-radius: 20px; padding: 32px 24px; text-align: center;
+      border: 1px solid #eee; transition: all 0.3s;
+    }
+    .service-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,0.08); }
+    .service-icon { width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px; background: linear-gradient(135deg, var(--primary-50), var(--primary-100)); color: var(--primary-600); }
+    .service-card h4 { font-family: 'Playfair Display'; font-size: 18px; color: #0b426e; margin-bottom: 10px; }
+    .service-card p { color: #999; font-size: 13px; line-height: 1.6; }
+
+    /* CTA Section */
+    .cta-section {
+      background: linear-gradient(135deg, #072a49, #0b426e); position: relative; overflow: hidden;
+    }
+    .cta-section::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(circle at 80% 20%, rgba(228,136,32,0.15) 0%, transparent 60%);
+    }
+    .cta-content { position: relative; z-index: 2; text-align: center; max-width: 700px; margin: 0 auto; }
+    .cta-content h2 { font-family: 'Playfair Display'; font-size: 40px; font-weight: 800; color: white; margin-bottom: 16px; }
+    .cta-content p { color: rgba(255,255,255,0.7); font-size: 17px; margin-bottom: 36px; }
+    .cta-buttons { display: flex; gap: 16px; justify-content: center; }
+
+    /* Footer */
+    .footer { background: #0a0a14; padding: 64px 2rem 32px; color: rgba(255,255,255,0.5); }
+    .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px; max-width: 1200px; margin: 0 auto; }
+    .footer h4 { color: white; font-size: 15px; font-weight: 600; margin-bottom: 20px; }
+    .footer a { color: rgba(255,255,255,0.4); text-decoration: none; font-size: 14px; display: block; padding: 4px 0; transition: color 0.2s; }
+    .footer a:hover { color: var(--gold-400); }
+    .footer-bottom { text-align: center; margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 13px; max-width: 1200px; margin-left: auto; margin-right: auto; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero-content { grid-template-columns: 1fr; }
+      .hero-visual { display: none; }
+      .hero h1 { font-size: 36px; }
+      .formulas-grid { grid-template-columns: 1fr; }
+      .services-grid { grid-template-columns: repeat(2, 1fr); }
+      .nav-links { display: none; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+      .hero-stats { gap: 24px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-icon">IF</div>
+    <div class="nav-logo-text">Immobiliare <span>Fiumana</span></div>
+  </a>
+  <div class="nav-links">
+    <a href="#servizi">Servizi</a>
+    <a href="#formule">Le Nostre Formule</a>
+    <a href="#chi-siamo">Chi Siamo</a>
+    <a href="#contatti" class="btn-primary" style="padding: 10px 24px; font-size: 14px;">Contattaci</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-content">
+    <div>
+      <div class="hero-badge">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--gold-400);display:inline-block;"></span>
+        Specialisti in Affitti Brevi dal 2023
+      </div>
+      <h1>Il tuo immobile merita di <span class="highlight">rendere al massimo</span></h1>
+      <p>Affida la gestione del tuo immobile a professionisti del settore. Massimizziamo i tuoi ricavi con formule flessibili, dalla gestione completa all'affitto garantito.</p>
+      <div class="hero-buttons">
+        <a href="#contatti" class="btn-primary" style="padding: 16px 32px; font-size: 16px;">
+          Richiedi Valutazione Gratuita
+        </a>
+        <a href="#formule" class="btn-outline">Scopri le Formule</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-item">
+          <div class="stat-number">150+</div>
+          <div class="stat-label">Immobili Gestiti</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">98%</div>
+          <div class="stat-label">Clienti Soddisfatti</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">+35%</div>
+          <div class="stat-label">Rendimento Medio</div>
+        </div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="hero-card-main">
+        <h3>Cosa facciamo per te</h3>
+        <div class="hero-card-item">
+          <div class="hero-card-icon">&#9733;</div>
+          <div class="hero-card-text"><strong>Gestione Completa</strong>Dalla A alla Z, pensiamo a tutto noi</div>
+        </div>
+        <div class="hero-card-item">
+          <div class="hero-card-icon">&#9878;</div>
+          <div class="hero-card-text"><strong>Burocrazia Inclusa</strong>Pratiche, tasse, registrazioni ospiti</div>
+        </div>
+        <div class="hero-card-item">
+          <div class="hero-card-icon">&#128176;</div>
+          <div class="hero-card-text"><strong>Affitto Garantito</strong>Rendita sicura ogni mese</div>
+        </div>
+      </div>
+      <div class="floating-badge top-right">
+        <div class="fb-icon fb-green">&#10003;</div>
+        <div class="fb-text">Tasso occupazione<strong>92% medio</strong></div>
+      </div>
+      <div class="floating-badge bottom-left">
+        <div class="fb-icon fb-blue">&#9733;</div>
+        <div class="fb-text">Recensioni ospiti<strong>4.9 / 5.0</strong></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Servizi -->
+<section class="section services-section" id="servizi">
+  <div class="section-header">
+    <div class="section-badge">I Nostri Servizi</div>
+    <h2>Gestione a 360 gradi</h2>
+    <p>Dalla preparazione dell'immobile alla gestione quotidiana degli ospiti, ci occupiamo di ogni aspetto.</p>
+  </div>
+  <div class="services-grid">
+    <div class="service-card">
+      <div class="service-icon" style="font-size: 28px;">&#127968;</div>
+      <h4>Setup Immobile</h4>
+      <p>Arredamento, fotografia professionale, listing ottimizzato su tutte le piattaforme</p>
+    </div>
+    <div class="service-card">
+      <div class="service-icon" style="font-size: 28px;">&#128197;</div>
+      <h4>Revenue Management</h4>
+      <p>Prezzi dinamici, analisi di mercato e ottimizzazione delle tariffe per massimizzare i ricavi</p>
+    </div>
+    <div class="service-card">
+      <div class="service-icon" style="font-size: 28px;">&#128100;</div>
+      <h4>Gestione Ospiti</h4>
+      <p>Check-in/out, comunicazione 24/7, supporto multilingue e assistenza continua</p>
+    </div>
+    <div class="service-card">
+      <div class="service-icon" style="font-size: 28px;">&#128196;</div>
+      <h4>Adempimenti Legali</h4>
+      <p>Registrazione Portale Alloggiati, tassa di soggiorno, contratti e comunicazioni obbligatorie</p>
+    </div>
+  </div>
+</section>
+
+<!-- Formule -->
+<section class="section" id="formule">
+  <div class="section-header">
+    <div class="section-badge">Le Nostre Formule</div>
+    <h2>Una formula per ogni esigenza</h2>
+    <p>Scegli la soluzione più adatta alle tue necessità. Dalla gestione condivisa fino all'affitto garantito.</p>
+  </div>
+  <div class="formulas-grid">
+    <!-- Standard -->
+    <div class="formula-card">
+      <div class="formula-icon blue" style="font-size: 28px;">&#127968;</div>
+      <h3>Gestione Standard</h3>
+      <p class="desc">Ideale per chi vuole iniziare con la gestione professionale del proprio immobile con un costo contenuto.</p>
+      <ul class="formula-features">
+        <li><span class="check">&#10003;</span> Pubblicazione su Airbnb e Booking.com</li>
+        <li><span class="check">&#10003;</span> Gestione calendario e prenotazioni</li>
+        <li><span class="check">&#10003;</span> Check-in e check-out ospiti</li>
+        <li><span class="check">&#10003;</span> Pulizie professionali</li>
+        <li><span class="check">&#10003;</span> Registrazione Portale Alloggiati</li>
+        <li><span class="check">&#10003;</span> Reportistica mensile</li>
+      </ul>
+      <a href="#contatti" class="btn-primary">Richiedi Info</a>
+    </div>
+    <!-- Premium -->
+    <div class="formula-card featured">
+      <div class="formula-icon gold" style="font-size: 28px;">&#9733;</div>
+      <h3>Gestione Premium</h3>
+      <p class="desc">La soluzione completa per chi vuole il massimo rendimento senza alcun pensiero.</p>
+      <ul class="formula-features">
+        <li><span class="check">&#10003;</span> Tutto della Gestione Standard</li>
+        <li><span class="check">&#10003;</span> Fotografia e home staging professionali</li>
+        <li><span class="check">&#10003;</span> Prezzi dinamici con revenue management</li>
+        <li><span class="check">&#10003;</span> Manutenzione ordinaria inclusa</li>
+        <li><span class="check">&#10003;</span> Assistenza ospiti 24/7</li>
+        <li><span class="check">&#10003;</span> Gestione burocratica completa</li>
+        <li><span class="check">&#10003;</span> Tassa di soggiorno e SCIA</li>
+      </ul>
+      <a href="#contatti" class="btn-primary gold-btn">Scopri la Premium</a>
+    </div>
+    <!-- Affitto Garantito -->
+    <div class="formula-card">
+      <div class="formula-icon green" style="font-size: 28px;">&#128176;</div>
+      <h3>Affitto Garantito</h3>
+      <p class="desc">Zero rischi, zero pensieri. Ti paghiamo un canone fisso mensile garantito, indipendentemente dall'occupazione.</p>
+      <ul class="formula-features">
+        <li><span class="check">&#10003;</span> Canone mensile fisso garantito</li>
+        <li><span class="check">&#10003;</span> Pagamento puntuale ogni mese</li>
+        <li><span class="check">&#10003;</span> Zero rischio di vacancy</li>
+        <li><span class="check">&#10003;</span> Nessun costo di gestione</li>
+        <li><span class="check">&#10003;</span> Manutenzione a nostro carico</li>
+        <li><span class="check">&#10003;</span> Contratto trasparente</li>
+      </ul>
+      <a href="#contatti" class="btn-primary">Richiedi Valutazione</a>
+    </div>
+  </div>
+</section>
+
+<!-- Chi Siamo -->
+<section class="section services-section" id="chi-siamo">
+  <div class="section-header">
+    <div class="section-badge">Chi Siamo</div>
+    <h2>Immobiliare Fiumana</h2>
+    <p>Da anni nel settore immobiliare con immobili di proprietà commerciali e residenziali in tutta Italia. Da 3 anni specializzati nella gestione professionale degli affitti brevi.</p>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; max-width: 1200px; margin: 0 auto;">
+    <div class="service-card">
+      <div style="font-size: 36px; font-family: 'Playfair Display'; font-weight: 800; color: var(--primary-600); margin-bottom: 8px;">3+</div>
+      <h4>Anni di esperienza</h4>
+      <p>Specializzati in affitti brevi</p>
+    </div>
+    <div class="service-card">
+      <div style="font-size: 36px; font-family: 'Playfair Display'; font-weight: 800; color: var(--gold-500); margin-bottom: 8px;">150+</div>
+      <h4>Immobili gestiti</h4>
+      <p>In tutta Italia</p>
+    </div>
+    <div class="service-card">
+      <div style="font-size: 36px; font-family: 'Playfair Display'; font-weight: 800; color: #059669; margin-bottom: 8px;">5000+</div>
+      <h4>Ospiti accolti</h4>
+      <p>Con recensioni eccellenti</p>
+    </div>
+    <div class="service-card">
+      <div style="font-size: 36px; font-family: 'Playfair Display'; font-weight: 800; color: var(--primary-800); margin-bottom: 8px;">24/7</div>
+      <h4>Assistenza</h4>
+      <p>Sempre disponibili</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="section cta-section" id="contatti">
+  <div class="cta-content">
+    <h2>Pronto a valorizzare il tuo immobile?</h2>
+    <p>Richiedi una valutazione gratuita e scopri quanto può rendere il tuo immobile con la nostra gestione professionale.</p>
+    <div class="cta-buttons">
+      <a href="mailto:info@immobiliarefiumana.it" class="btn-primary" style="padding: 16px 36px; font-size: 16px; background: linear-gradient(135deg, var(--gold-500), var(--gold-600)); box-shadow: 0 4px 15px rgba(228,136,32,0.4);">
+        Contattaci Ora
+      </a>
+      <a href="tel:+390543000000" class="btn-outline">Chiamaci</a>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-grid">
+    <div>
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+        <div class="nav-logo-icon">IF</div>
+        <div style="font-family: 'Playfair Display'; font-weight: 700; font-size: 20px; color: white;">Immobiliare <span style="color: var(--gold-500);">Fiumana</span></div>
+      </div>
+      <p style="font-size: 14px; line-height: 1.8; max-width: 300px;">Specialisti nella gestione professionale di immobili per affitti brevi in Italia. Massimizziamo il rendimento del tuo immobile.</p>
+    </div>
+    <div>
+      <h4>Servizi</h4>
+      <a href="#">Gestione Standard</a>
+      <a href="#">Gestione Premium</a>
+      <a href="#">Affitto Garantito</a>
+      <a href="#">Setup Immobile</a>
+    </div>
+    <div>
+      <h4>Azienda</h4>
+      <a href="#">Chi Siamo</a>
+      <a href="#">Il Team</a>
+      <a href="#">Lavora con noi</a>
+      <a href="#">Blog</a>
+    </div>
+    <div>
+      <h4>Contatti</h4>
+      <a href="#">info@immobiliarefiumana.it</a>
+      <a href="#">+39 0543 000 000</a>
+      <a href="#">Via Roma 123, Bertinoro (FC)</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    &copy; 2024 Immobiliare Fiumana. Tutti i diritti riservati. | Privacy Policy | Cookie Policy
+  </div>
+</footer>
+
+</body>
+</html>
