@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { dbExecute } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,12 +11,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Nome, cognome e email obbligatori' }, { status: 400 });
     }
 
-    const db = getDb();
-
-    db.prepare(`
-      INSERT INTO contact_requests (nome, cognome, email, telefono, citta_immobile, tipo_immobile, formula_interesse, messaggio)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(nome, cognome, email, telefono || null, citta_immobile || null, tipo_immobile || null, formula_interesse || null, messaggio || null);
+    await dbExecute(
+      `INSERT INTO contact_requests (nome, cognome, email, telefono, citta_immobile, tipo_immobile, formula_interesse, messaggio)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [nome, cognome, email, telefono || null, citta_immobile || null, tipo_immobile || null, formula_interesse || null, messaggio || null]
+    );
 
     return NextResponse.json({ success: true, message: 'Richiesta inviata con successo' });
   } catch (error: any) {
