@@ -87,6 +87,7 @@ Al suo interno troverete le chiavi della suite e del cancello automatico per pot
 Non c'è un posto assegnato quindi potete parcheggiare dove trovate posto.
 Per quanto riguarda il Wi-Fi, la rete è Suite sul mare Guest e la password: suitesulmare2025
 La signora delle pulizie ha lasciato l'appartamento pronto all'uso con frigorifero attaccato e quadro elettrico acceso.
+Il Comune di Comacchio ha predisposto i cassonetti della spazzatura che si aprono con una tessera che troverete accanto al piano cottura. Vi consigliamo di usare sacchetti piccoli, altrimenti non entrano nell'indifferenziato.
 
 I nostri numeri per qualsiasi esigenza sono:
 +393939011011 Fabio
