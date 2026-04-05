@@ -48,10 +48,10 @@ export default function HomePage() {
   const contentRef = useReveal();
 
   const stats = [
-    { number: '150+', label: 'Immobili Gestiti' },
-    { number: '98%', label: 'Tasso Occupazione' },
-    { number: '60+', label: 'Anni di Esperienza' },
-    { number: '4.9', label: 'Rating Medio Ospiti' },
+    { number: '10+', label: 'Immobili Gestiti' },
+    { number: '95%', label: 'Tasso Occupazione' },
+    { number: '5+', label: 'Anni di Esperienza' },
+    { number: '4.8', label: 'Rating Medio Ospiti' },
   ];
 
   const services = [
@@ -359,7 +359,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* === PROPERTIES === */}
+      {/* === PROPERTIES === TEMPORANEAMENTE NASCOSTO
       <section className="section-padding bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16 reveal">
@@ -426,6 +426,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      */}
 
       {/* === FORMULAS === */}
       <section className="section-padding hero-gradient particles-overlay">

@@ -55,9 +55,8 @@ export default function ChiSiamoPage() {
   const milestones = [
     { year: '2020', title: 'Fondazione', desc: 'Nasce Immobiliare Fiumana con focus su compravendita e immobili commerciali.' },
     { year: '2023', title: 'Affitti Brevi', desc: 'Iniziamo la specializzazione nella gestione di immobili per affitti brevi.' },
-    { year: '2024', title: 'Crescita', desc: 'Superiamo i 100 immobili gestiti con presenza in tutta Italia.' },
+    { year: '2024', title: 'Crescita', desc: 'Raggiungiamo i primi 10 immobili gestiti in Emilia-Romagna.' },
     { year: '2025', title: 'Innovazione', desc: 'Lanciamo la formula Affitto Garantito e la piattaforma digitale per proprietari.' },
-    { year: '2026', title: 'Espansione', desc: 'Oltre 150 immobili gestiti e apertura a nuovi mercati turistici italiani.' },
   ];
 
   return (
@@ -117,19 +116,19 @@ export default function ChiSiamoPage() {
                 <Building2 className="w-24 h-24 text-primary-300 mx-auto mb-6" />
                 <div className="grid grid-cols-2 gap-6">
                   <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="text-2xl font-bold text-primary-600">150+</div>
+                    <div className="text-2xl font-bold text-primary-600">10+</div>
                     <div className="text-sm text-gray-500">Immobili Gestiti</div>
                   </div>
                   <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="text-2xl font-bold text-gold-500">98%</div>
+                    <div className="text-2xl font-bold text-gold-500">95%</div>
                     <div className="text-sm text-gray-500">Tasso Occupazione</div>
                   </div>
                   <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="text-2xl font-bold text-primary-600">10k+</div>
+                    <div className="text-2xl font-bold text-primary-600">500+</div>
                     <div className="text-sm text-gray-500">Ospiti Accolti</div>
                   </div>
                   <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="text-2xl font-bold text-gold-500">4.9</div>
+                    <div className="text-2xl font-bold text-gold-500">4.8</div>
                     <div className="text-sm text-gray-500">Rating Medio</div>
                   </div>
                 </div>

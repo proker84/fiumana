@@ -17,6 +17,10 @@ import {
   ExternalLink,
   Loader2,
   AlertCircle,
+  RotateCcw,
+  X,
+  AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 
 interface Guest {
@@ -49,6 +53,7 @@ interface Booking {
   status: string;
   alloggiati_sent: number;
   platform: string;
+  correction_note: string | null;
 }
 
 const TIPO_ALLOGGIATO_LABELS: Record<string, string> = {
@@ -67,6 +72,28 @@ const TIPO_DOCUMENTO_LABELS: Record<string, string> = {
   'PASEX': 'Passaporto Estero',
 };
 
+const COUNTRY_LABELS: Record<string, string> = {
+  '100000100': 'Italia',
+  '100000203': 'Germania',
+  '100000209': 'Francia',
+  '100000219': 'Spagna',
+  '100000215': 'Regno Unito',
+  '100000336': 'Stati Uniti',
+  '100000220': 'Svizzera',
+  '100000201': 'Austria',
+  '100000213': 'Olanda',
+  '100000202': 'Belgio',
+  '100000214': 'Portogallo',
+  '100000235': 'Romania',
+  '100000233': 'Polonia',
+  '100000602': 'Brasile',
+  '100000404': 'Cina',
+  '100000413': 'Giappone',
+  '100000501': 'Australia',
+};
+
+const getCountryName = (code: string) => COUNTRY_LABELS[code] || code;
+
 export default function BookingDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -76,6 +103,22 @@ export default function BookingDetailPage() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Correction request state
+  const [showCorrectionModal, setShowCorrectionModal] = useState(false);
+  const [correctionNote, setCorrectionNote] = useState('');
+  const [sendingCorrection, setSendingCorrection] = useState(false);
+  const [correctionResult, setCorrectionResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Alloggiati submit state
+  const [showAlloggiatiModal, setShowAlloggiatiModal] = useState(false);
+  const [alloggiatiConfirmed, setAlloggiatiConfirmed] = useState(false);
+  const [sendingAlloggiati, setSendingAlloggiati] = useState(false);
+  const [alloggiatiResult, setAlloggiatiResult] = useState<{ success: boolean; message: string; testMode?: boolean } | null>(null);
+
+  // Delete booking state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchBookingDetails();
@@ -114,6 +157,111 @@ export default function BookingDetailPage() {
     setTimeout(() => setCopiedLink(false), 2000);
   }
 
+  async function deleteBooking() {
+    setDeleting(true);
+    try {
+      const token = document.cookie.split('; ').find(c => c.startsWith('auth_token='))?.split('=')[1];
+      const res = await fetch(`/api/bookings/${bookingId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        router.push('/admin/prenotazioni');
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Errore durante l\'eliminazione');
+      }
+    } catch (err) {
+      alert('Errore di connessione');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function submitToAlloggiati() {
+    if (!alloggiatiConfirmed) return;
+
+    setSendingAlloggiati(true);
+    setAlloggiatiResult(null);
+
+    try {
+      const token = document.cookie.split('; ').find(c => c.startsWith('auth_token='))?.split('=')[1];
+      const res = await fetch('/api/alloggiati', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ bookingId: booking?.id }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setAlloggiatiResult({
+          success: true,
+          message: data.message,
+          testMode: data.testMode,
+        });
+        fetchBookingDetails();
+        setTimeout(() => {
+          setShowAlloggiatiModal(false);
+          setAlloggiatiConfirmed(false);
+          setAlloggiatiResult(null);
+        }, 3000);
+      } else {
+        setAlloggiatiResult({
+          success: false,
+          message: data.error || 'Errore durante l\'invio',
+        });
+      }
+    } catch (err) {
+      setAlloggiatiResult({ success: false, message: 'Errore di connessione' });
+    } finally {
+      setSendingAlloggiati(false);
+    }
+  }
+
+  async function requestCorrection() {
+    if (!correctionNote.trim()) return;
+
+    setSendingCorrection(true);
+    setCorrectionResult(null);
+
+    try {
+      const token = document.cookie.split('; ').find(c => c.startsWith('auth_token='))?.split('=')[1];
+      const res = await fetch(`/api/bookings/${bookingId}/request-correction`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ note: correctionNote }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setCorrectionResult({ success: true, message: data.message });
+        // Refresh booking data
+        fetchBookingDetails();
+        // Close modal after 2 seconds
+        setTimeout(() => {
+          setShowCorrectionModal(false);
+          setCorrectionNote('');
+          setCorrectionResult(null);
+        }, 2000);
+      } else {
+        setCorrectionResult({ success: false, message: data.error });
+      }
+    } catch (err) {
+      setCorrectionResult({ success: false, message: 'Errore di connessione' });
+    } finally {
+      setSendingCorrection(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -144,11 +292,29 @@ export default function BookingDetailPage() {
         >
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">Prenotazione {booking.booking_id}</h1>
           <p className="text-gray-500 text-sm mt-1">Dettagli prenotazione e ospiti registrati</p>
         </div>
+        <button
+          onClick={() => setShowDeleteModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
+        >
+          <Trash2 className="w-4 h-4" />
+          Elimina
+        </button>
       </div>
+
+      {/* Correction Status Banner */}
+      {booking.status === 'needs_correction' && booking.correction_note && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-medium text-amber-800">Correzione richiesta</h3>
+            <p className="text-amber-700 text-sm mt-1">{booking.correction_note}</p>
+          </div>
+        </div>
+      )}
 
       {/* Booking Info Card */}
       <div className="admin-card mb-6">
@@ -183,7 +349,11 @@ export default function BookingDetailPage() {
           </div>
 
           <div className="flex flex-col gap-2">
-            {booking.alloggiati_sent ? (
+            {booking.status === 'needs_correction' ? (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-3 py-1.5 rounded-full">
+                <AlertTriangle className="w-3.5 h-3.5" /> Correzione richiesta
+              </span>
+            ) : booking.alloggiati_sent ? (
               <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-3 py-1.5 rounded-full">
                 <CheckCircle2 className="w-3.5 h-3.5" /> Inviato ad Alloggiati
               </span>
@@ -218,6 +388,27 @@ export default function BookingDetailPage() {
           <Users className="w-5 h-5 text-primary-500" />
           Ospiti Registrati ({guests.length})
         </h2>
+
+        {guests.length > 0 && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowCorrectionModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors text-sm font-medium"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Richiedi correzione
+            </button>
+            {!booking.alloggiati_sent && (
+              <button
+                onClick={() => setShowAlloggiatiModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+              >
+                <Send className="w-4 h-4" />
+                Invia al Portale Alloggiati
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {guests.length === 0 ? (
@@ -272,7 +463,7 @@ export default function BookingDetailPage() {
                     </div>
                     <div>
                       <span className="text-xs text-gray-400">Cittadinanza</span>
-                      <p className="text-gray-700">{guest.cittadinanza}</p>
+                      <p className="text-gray-700">{getCountryName(guest.cittadinanza)}</p>
                     </div>
                   </div>
 
@@ -304,7 +495,7 @@ export default function BookingDetailPage() {
                       <div className="mt-4 flex gap-3">
                         {guest.documento_fronte && (
                           <a
-                            href={`/api/documents/${guest.documento_fronte}`}
+                            href={guest.documento_fronte.startsWith('http') ? guest.documento_fronte : `/api/documents/${guest.documento_fronte}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm text-gray-700 hover:bg-gray-200 transition-colors"
@@ -315,7 +506,7 @@ export default function BookingDetailPage() {
                         )}
                         {guest.documento_retro && (
                           <a
-                            href={`/api/documents/${guest.documento_retro}`}
+                            href={guest.documento_retro.startsWith('http') ? guest.documento_retro : `/api/documents/${guest.documento_retro}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm text-gray-700 hover:bg-gray-200 transition-colors"
@@ -331,6 +522,254 @@ export default function BookingDetailPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-red-500" />
+                Elimina Prenotazione
+              </h3>
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-red-800">Attenzione</h4>
+                    <p className="text-red-700 text-sm mt-1">
+                      Stai per eliminare definitivamente la prenotazione <strong>{booking.booking_id}</strong> e tutti i dati degli ospiti associati.
+                      Questa operazione non può essere annullata.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 p-5 border-t border-gray-100">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={deleteBooking}
+                disabled={deleting}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Eliminazione...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Elimina definitivamente
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alloggiati Confirmation Modal */}
+      {showAlloggiatiModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Send className="w-5 h-5 text-primary-500" />
+                Invio al Portale Alloggiati
+              </h3>
+              <button
+                onClick={() => {
+                  setShowAlloggiatiModal(false);
+                  setAlloggiatiConfirmed(false);
+                  setAlloggiatiResult(null);
+                }}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-red-800">Attenzione: Invio REALE</h4>
+                    <p className="text-red-700 text-sm mt-1">
+                      Stai per inviare i dati di <strong>{guests.length} ospiti</strong> al Portale Alloggiati della Polizia di Stato.
+                      Questa operazione <strong>non può essere annullata</strong>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-4 mb-4">
+                <p className="text-sm text-gray-600 mb-2"><strong>Prenotazione:</strong> {booking.booking_id}</p>
+                <p className="text-sm text-gray-600 mb-2"><strong>Check-in:</strong> {booking.check_in}</p>
+                <p className="text-sm text-gray-600"><strong>Ospiti:</strong> {guests.map(g => `${g.nome} ${g.cognome}`).join(', ')}</p>
+              </div>
+
+              <label className="flex items-start gap-3 cursor-pointer p-4 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={alloggiatiConfirmed}
+                  onChange={(e) => setAlloggiatiConfirmed(e.target.checked)}
+                  className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 mt-0.5"
+                />
+                <span className="text-sm text-gray-700">
+                  Confermo di voler inviare questi dati al Portale Alloggiati della Polizia di Stato.
+                  Ho verificato che tutti i dati siano corretti.
+                </span>
+              </label>
+
+              {alloggiatiResult && (
+                <div className={`mt-4 p-3 rounded-lg flex items-center gap-2 text-sm ${
+                  alloggiatiResult.success
+                    ? 'bg-green-50 text-green-700'
+                    : 'bg-red-50 text-red-700'
+                }`}>
+                  {alloggiatiResult.success ? (
+                    <CheckCircle2 className="w-4 h-4" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4" />
+                  )}
+                  {alloggiatiResult.message}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 p-5 border-t border-gray-100">
+              <button
+                onClick={() => {
+                  setShowAlloggiatiModal(false);
+                  setAlloggiatiConfirmed(false);
+                  setAlloggiatiResult(null);
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={submitToAlloggiati}
+                disabled={!alloggiatiConfirmed || sendingAlloggiati}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {sendingAlloggiati ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Invio in corso...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Conferma e Invia
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Correction Modal */}
+      {showCorrectionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-amber-500" />
+                Richiedi correzione
+              </h3>
+              <button
+                onClick={() => {
+                  setShowCorrectionModal(false);
+                  setCorrectionNote('');
+                  setCorrectionResult(null);
+                }}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              <p className="text-sm text-gray-600 mb-4">
+                Descrivi cosa deve essere corretto. Il cliente riceverà una email con queste istruzioni
+                e potrà accedere nuovamente al form per modificare i dati.
+              </p>
+
+              <textarea
+                value={correctionNote}
+                onChange={(e) => setCorrectionNote(e.target.value)}
+                placeholder="Es: Il documento è illeggibile, per favore carica una foto più chiara..."
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm resize-none"
+                rows={4}
+              />
+
+              {correctionResult && (
+                <div className={`mt-4 p-3 rounded-lg flex items-center gap-2 text-sm ${
+                  correctionResult.success
+                    ? 'bg-green-50 text-green-700'
+                    : 'bg-red-50 text-red-700'
+                }`}>
+                  {correctionResult.success ? (
+                    <CheckCircle2 className="w-4 h-4" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4" />
+                  )}
+                  {correctionResult.message}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 p-5 border-t border-gray-100">
+              <button
+                onClick={() => {
+                  setShowCorrectionModal(false);
+                  setCorrectionNote('');
+                  setCorrectionResult(null);
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={requestCorrection}
+                disabled={!correctionNote.trim() || sendingCorrection}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {sendingCorrection ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Invio...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Invia richiesta
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

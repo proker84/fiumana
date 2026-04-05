@@ -100,6 +100,9 @@ export const translations: Record<Language, Record<string, string>> = {
     documentFrontRequired: 'Foto fronte documento obbligatoria',
     documentBackRequired: 'Foto retro documento obbligatoria',
     required: 'obbligatorio',
+    correctionRequired: 'Correzione Richiesta',
+    pleaseCorrect: 'Per favore, correggi i dati indicati e reinvia il modulo.',
+    fixErrorsBeforeSubmit: 'Completa tutti i campi obbligatori prima di procedere. I campi mancanti sono evidenziati in rosso.',
   },
 
   en: {
@@ -171,6 +174,9 @@ export const translations: Record<Language, Record<string, string>> = {
     documentDeletionNotice: 'Uploaded documents will be automatically deleted from the system after successful transmission to the Italian Police Accommodation Portal.',
     documentFrontRequired: 'Front document photo is required',
     documentBackRequired: 'Back document photo is required',
+    correctionRequired: 'Correction Required',
+    pleaseCorrect: 'Please correct the indicated data and resubmit the form.',
+    fixErrorsBeforeSubmit: 'Please complete all required fields before proceeding. Missing fields are highlighted in red.',
     required: 'required',
   },
 
@@ -243,6 +249,9 @@ export const translations: Record<Language, Record<string, string>> = {
     documentDeletionNotice: 'Hochgeladene Dokumente werden nach erfolgreicher Übermittlung an das italienische Polizei-Unterkunftsportal automatisch aus dem System gelöscht.',
     documentFrontRequired: 'Foto der Vorderseite des Dokuments erforderlich',
     documentBackRequired: 'Foto der Rückseite des Dokuments erforderlich',
+    correctionRequired: 'Korrektur erforderlich',
+    pleaseCorrect: 'Bitte korrigieren Sie die angegebenen Daten und senden Sie das Formular erneut.',
+    fixErrorsBeforeSubmit: 'Bitte füllen Sie alle Pflichtfelder aus, bevor Sie fortfahren. Fehlende Felder sind rot markiert.',
     required: 'erforderlich',
   },
 
@@ -315,6 +324,9 @@ export const translations: Record<Language, Record<string, string>> = {
     documentDeletionNotice: 'Les documents téléchargés seront automatiquement supprimés du système après transmission réussie au Portail d\'Hébergement de la Police italienne.',
     documentFrontRequired: 'Photo du recto du document obligatoire',
     documentBackRequired: 'Photo du verso du document obligatoire',
+    correctionRequired: 'Correction requise',
+    pleaseCorrect: 'Veuillez corriger les données indiquées et renvoyer le formulaire.',
+    fixErrorsBeforeSubmit: 'Veuillez remplir tous les champs obligatoires avant de continuer. Les champs manquants sont surlignés en rouge.',
     required: 'obligatoire',
   },
 
@@ -387,6 +399,9 @@ export const translations: Record<Language, Record<string, string>> = {
     documentDeletionNotice: 'Los documentos subidos serán eliminados automáticamente del sistema tras la transmisión exitosa al Portal de Alojamiento de la Policía italiana.',
     documentFrontRequired: 'Foto del anverso del documento obligatoria',
     documentBackRequired: 'Foto del reverso del documento obligatoria',
+    correctionRequired: 'Corrección requerida',
+    pleaseCorrect: 'Por favor, corrija los datos indicados y vuelva a enviar el formulario.',
+    fixErrorsBeforeSubmit: 'Por favor, complete todos los campos obligatorios antes de continuar. Los campos faltantes están resaltados en rojo.',
     required: 'obligatorio',
   },
 };

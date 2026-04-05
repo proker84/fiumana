@@ -7,10 +7,10 @@ import Footer from './Footer';
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // Non mostrare navbar/footer per admin e guest
-  const isAdminOrGuest = pathname?.startsWith('/admin') || pathname?.startsWith('/guest');
+  // Non mostrare navbar/footer per admin, guest e pulizie
+  const isSpecialPage = pathname?.startsWith('/admin') || pathname?.startsWith('/guest') || pathname?.startsWith('/pulizie');
 
-  if (isAdminOrGuest) {
+  if (isSpecialPage) {
     return <>{children}</>;
   }
 

@@ -46,6 +46,8 @@ interface BookingInfo {
   check_in: string;
   check_out: string;
   num_guests: number;
+  status: string;
+  correction_note: string | null;
 }
 
 const COMMON_COUNTRIES = [
@@ -183,6 +185,7 @@ export default function GuestPage() {
   function validateGuests(): boolean {
     const errors: Record<number, string[]> = {};
     let valid = true;
+    let firstErrorGuestId: number | null = null;
 
     guests.forEach((g) => {
       const guestErrors: string[] = [];
@@ -207,10 +210,33 @@ export default function GuestPage() {
       if (guestErrors.length > 0) {
         errors[g.id] = guestErrors;
         valid = false;
+        if (firstErrorGuestId === null) {
+          firstErrorGuestId = g.id;
+        }
       }
     });
 
     setValidationErrors(errors);
+
+    // If there are errors, open the guest cards with errors and scroll to first error
+    if (!valid && firstErrorGuestId !== null) {
+      setGuests((prev) =>
+        prev.map((g) => ({
+          ...g,
+          isOpen: errors[g.id] ? true : g.isOpen,
+        }))
+      );
+
+      // Set error message
+      const totalErrors = Object.values(errors).flat().length;
+      setError(t('fixErrorsBeforeSubmit') || `Completa tutti i campi obbligatori (${totalErrors} campi mancanti)`);
+
+      // Scroll to top after a short delay to let the cards open
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
+    }
+
     return valid;
   }
 
@@ -229,7 +255,7 @@ export default function GuestPage() {
       if (res.ok) {
         const data = await res.json();
         const field = side === 'front' ? 'documento_fronte' : 'documento_retro';
-        updateGuest(guestId, field, data.filename);
+        updateGuest(guestId, field, data.url);
       } else {
         const data = await res.json();
         setError(data.error || 'Errore upload');
@@ -382,6 +408,20 @@ export default function GuestPage() {
           </h1>
           <p className="text-gray-500 text-sm">{t('fillGuestData')}</p>
         </div>
+
+        {/* Correction Notice */}
+        {booking && booking.status === 'needs_correction' && booking.correction_note && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-amber-800 text-lg">{t('correctionRequired') || 'Correzione richiesta'}</h3>
+                <p className="text-amber-700 mt-2">{booking.correction_note}</p>
+                <p className="text-amber-600 text-sm mt-3">{t('pleaseCorrect') || 'Per favore, correggi i dati indicati e reinvia il modulo.'}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Booking Info */}
         {booking && (

@@ -14,6 +14,8 @@ import {
   Menu,
   X,
   ChevronRight,
+  MessageSquare,
+  Brush,
 } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -63,6 +65,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navItems = [
     { href: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
     { href: '/admin/prenotazioni', icon: CalendarDays, label: 'Prenotazioni' },
+    { href: '/admin/pulizie', icon: Brush, label: 'Pulizie' },
+    { href: '/admin/richieste', icon: MessageSquare, label: 'Richieste' },
     { href: '/admin/import-csv', icon: Upload, label: 'Importa CSV' },
     { href: '/admin/impostazioni', icon: Settings, label: 'Impostazioni' },
   ];
@@ -119,9 +123,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
               Accedi
             </button>
-            <p className="text-center text-xs text-gray-400">
-              Credenziali default: admin / admin2024!
-            </p>
           </form>
         </div>
       </div>

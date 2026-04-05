@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const booking = await dbQueryOne(
-      'SELECT id, booking_id, guest_name, check_in, check_out, num_guests FROM bookings WHERE guest_token = ?',
+      'SELECT id, booking_id, guest_name, check_in, check_out, num_guests, status, correction_note FROM bookings WHERE guest_token = ?',
       [token]
     );
 
@@ -93,9 +93,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Update booking status
+    // Update booking status and clear any correction note
     await dbExecute(
-      "UPDATE bookings SET status = 'guests_registered', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      "UPDATE bookings SET status = 'guests_registered', correction_note = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
       [booking.id]
     );
 

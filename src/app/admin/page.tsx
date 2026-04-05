@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   CalendarDays,
   Users,
@@ -8,25 +9,126 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  TrendingUp,
   ArrowUpRight,
+  CalendarClock,
+  Copy,
+  ExternalLink,
+  MapPin,
 } from 'lucide-react';
+
+interface Booking {
+  id: number;
+  booking_id: string;
+  guest_token: string;
+  guest_name: string;
+  guest_email: string;
+  check_in: string;
+  check_out: string;
+  num_guests: number;
+  status: string;
+  alloggiati_sent: number;
+}
 
 interface DashboardData {
   totalBookings: number;
   pendingGuests: number;
   todayCheckins: number;
   alloggiatiPending: number;
-  recentBookings: any[];
+  recentBookings: Booking[];
 }
 
 export default function AdminDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDashboard();
   }, []);
+
+  function getGuestLink(token: string) {
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/guest/${token}`;
+    }
+    return `/guest/${token}`;
+  }
+
+  function getGuestMessage(booking: Booking) {
+    const link = getGuestLink(booking.guest_token);
+    return `Ciao ${booking.guest_name?.split(' ')[0] || ''}!
+
+Grazie per aver prenotato con noi. Per completare il check-in, ti chiediamo di compilare i dati di tutti gli ospiti al seguente link:
+
+${link}
+
+È un obbligo di legge italiano (art. 109 TULPS) comunicare i dati degli ospiti al Portale Alloggiati.
+
+Ti chiediamo di compilare il modulo entro il giorno del check-in. Le istruzioni per il check-in ti saranno inviate il giorno prima del tuo arrivo.
+
+Grazie e buon soggiorno!
+Immobiliare Fiumana`;
+  }
+
+  function formatDateItalian(dateStr: string) {
+    const months = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+    const date = new Date(dateStr);
+    return `${date.getDate().toString().padStart(2, '0')} ${months[date.getMonth()]}`;
+  }
+
+  function getCheckInInstructions(booking: Booking) {
+    const checkInDate = formatDateItalian(booking.check_in);
+    const firstName = booking.guest_name?.split(' ')[0] || '';
+    return `Buongiorno ${firstName}, ecco le istruzioni per il check-in di domani ${checkInDate}:
+L'appartamento è in via Tofane 4 - Lido di Pomposa, condominio Adriana.
+https://maps.app.goo.gl/nr9mXs4WKy15V4eZ7
+Dovrete inizialmente parcheggiare all'esterno del condominio. I cancelletti pedonali ai lati della struttura sono sempre aperti. L'appartamento è nel settore B - Secondo piano, appartamento 7.
+Quando arrivate davanti alla casa, suonate il videocitofono con in mano i documenti utilizzati nel processo di registrazione e vi comunicheremo direttamente il codice per accedere alla keybox sulla destra del videocitofono.
+Al suo interno troverete le chiavi della suite e del cancello automatico per poter accedere all'interno con la macchina.
+Non c'è un posto assegnato quindi potete parcheggiare dove trovate posto.
+Per quanto riguarda il Wi-Fi, la rete è Suite sul mare Guest e la password: suitesulmare2025
+La signora delle pulizie ha lasciato l'appartamento pronto all'uso con frigorifero attaccato e quadro elettrico acceso.
+
+I nostri numeri per qualsiasi esigenza sono:
++393939011011 Fabio
++393884885053 David
+Restiamo a disposizione per qualsiasi informazione o chiarimento.
+Un caro saluto e a presto!
+Fabio & David`;
+  }
+
+  async function copyInstructions(booking: Booking) {
+    const message = getCheckInInstructions(booking);
+    await navigator.clipboard.writeText(message);
+    setCopiedId('instructions-' + booking.guest_token);
+    setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  async function copyLink(token: string, booking: Booking) {
+    const message = getGuestMessage(booking);
+    await navigator.clipboard.writeText(message);
+    setCopiedId(token);
+    setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  // Ordina per check-in e trova la prossima prenotazione
+  const sortedBookings = data?.recentBookings ? [...data.recentBookings].sort((a, b) => {
+    const dateA = new Date(a.check_in);
+    const dateB = new Date(b.check_in);
+    return dateA.getTime() - dateB.getTime();
+  }) : [];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const nextBooking = sortedBookings.find(b => {
+    const checkIn = new Date(b.check_in);
+    checkIn.setHours(0, 0, 0, 0);
+    return checkIn >= today;
+  });
+
+  const otherBookings = nextBooking
+    ? sortedBookings.filter(b => b.id !== nextBooking.id)
+    : sortedBookings;
 
   async function fetchDashboard() {
     try {
@@ -110,10 +212,99 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* Recent Bookings */}
+      {/* Prossima Prenotazione Imminente */}
+      {nextBooking && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <CalendarClock className="w-5 h-5 text-primary-500" />
+            <h2 className="text-lg font-semibold text-gray-900">Prossima Prenotazione</h2>
+          </div>
+          <div className={`border-2 rounded-2xl p-5 shadow-sm ${nextBooking.status === 'guests_registered' ? 'bg-gradient-to-r from-green-50 to-green-100 border-green-400' : 'bg-gradient-to-r from-primary-50 to-primary-100 border-primary-300'}`}>
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <span className={`text-xs font-medium uppercase ${nextBooking.status === 'guests_registered' ? 'text-green-600' : 'text-primary-600'}`}>Ospite</span>
+                  <p className="font-semibold text-gray-900 mt-1 flex items-center gap-2">
+                    {nextBooking.status === 'guests_registered' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                    {nextBooking.guest_name || '-'}
+                  </p>
+                  <p className="text-xs text-gray-500">{nextBooking.guest_email}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-primary-600 font-medium uppercase">Check-in</span>
+                  <p className="font-semibold text-gray-900 mt-1">{nextBooking.check_in}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-primary-600 font-medium uppercase">Check-out</span>
+                  <p className="font-semibold text-gray-900 mt-1">{nextBooking.check_out}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-primary-600 font-medium uppercase">Ospiti</span>
+                  <p className="font-semibold text-gray-900 mt-1 flex items-center gap-1">
+                    <Users className="w-4 h-4" /> {nextBooking.num_guests}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {nextBooking.alloggiati_sent ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-3 py-1.5 rounded-full">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Inviato
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-100 px-3 py-1.5 rounded-full">
+                    <Clock className="w-3.5 h-3.5" /> Da inviare
+                  </span>
+                )}
+                <button
+                  onClick={() => copyLink(nextBooking.guest_token, nextBooking)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-white border border-primary-300 text-primary-700 rounded-lg text-xs font-medium hover:bg-primary-50 transition-colors"
+                >
+                  {copiedId === nextBooking.guest_token ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Copiato!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      Copia Messaggio
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => copyInstructions(nextBooking)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-white border border-green-300 text-green-700 rounded-lg text-xs font-medium hover:bg-green-50 transition-colors"
+                >
+                  {copiedId === 'instructions-' + nextBooking.guest_token ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Copiato!
+                    </>
+                  ) : (
+                    <>
+                      <MapPin className="w-3.5 h-3.5" />
+                      Copia Istruzioni
+                    </>
+                  )}
+                </button>
+                <Link
+                  href={`/admin/prenotazioni/${nextBooking.id}`}
+                  className="px-4 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 transition-colors"
+                >
+                  Gestisci
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Altre Prenotazioni */}
       <div className="admin-card">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-gray-900">Prenotazioni Recenti</h2>
+          <h2 className="text-lg font-bold text-gray-900">
+            {nextBooking ? 'Altre Prenotazioni' : 'Prenotazioni'}
+          </h2>
           <a
             href="/admin/prenotazioni"
             className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
@@ -122,54 +313,81 @@ export default function AdminDashboard() {
           </a>
         </div>
 
-        {data?.recentBookings && data.recentBookings.length > 0 ? (
+        {otherBookings.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <th className="pb-3 pr-4">ID Booking</th>
                   <th className="pb-3 pr-4">Ospite</th>
                   <th className="pb-3 pr-4">Check-in</th>
                   <th className="pb-3 pr-4">Check-out</th>
-                  <th className="pb-3 pr-4">Stato</th>
-                  <th className="pb-3">Alloggiati</th>
+                  <th className="pb-3 pr-4">Alloggiati</th>
+                  <th className="pb-3">Link Ospiti</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {data.recentBookings.map((b: any) => (
-                  <tr key={b.id} className="text-sm">
-                    <td className="py-3 pr-4 font-mono text-xs text-gray-600">{b.booking_id}</td>
-                    <td className="py-3 pr-4 font-medium text-gray-900">{b.guest_name || '-'}</td>
+                {otherBookings.map((b) => (
+                  <tr key={b.id} className={`text-sm transition-colors ${b.status === 'guests_registered' ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
+                    <td className="py-3 pr-4">
+                      <div className="flex items-center gap-2">
+                        {b.status === 'guests_registered' && (
+                          <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                        )}
+                        <div>
+                          <Link href={`/admin/prenotazioni/${b.id}`} className="font-medium text-gray-900 hover:text-primary-600">
+                            {b.guest_name || '-'}
+                          </Link>
+                          <p className="text-xs text-gray-400">{b.booking_id}</p>
+                        </div>
+                      </div>
+                    </td>
                     <td className="py-3 pr-4 text-gray-600">{b.check_in}</td>
                     <td className="py-3 pr-4 text-gray-600">{b.check_out}</td>
                     <td className="py-3 pr-4">
-                      <span
-                        className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${
-                          b.status === 'confirmed'
-                            ? 'bg-green-50 text-green-700'
-                            : b.status === 'pending'
-                              ? 'bg-amber-50 text-amber-700'
-                              : 'bg-gray-50 text-gray-700'
-                        }`}
-                      >
-                        {b.status === 'confirmed' ? (
-                          <CheckCircle2 className="w-3 h-3" />
-                        ) : (
-                          <Clock className="w-3 h-3" />
-                        )}
-                        {b.status}
-                      </span>
-                    </td>
-                    <td className="py-3">
                       {b.alloggiati_sent ? (
-                        <span className="text-green-600 text-xs font-medium flex items-center gap-1">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
                           <CheckCircle2 className="w-3 h-3" /> Inviato
                         </span>
                       ) : (
-                        <span className="text-amber-600 text-xs font-medium flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" /> Da inviare
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">
+                          <Clock className="w-3 h-3" /> Pendente
                         </span>
                       )}
+                    </td>
+                    <td className="py-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => copyLink(b.guest_token, b)}
+                          className="p-1.5 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors"
+                          title="Copia messaggio registrazione"
+                        >
+                          {copiedId === b.guest_token ? (
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => copyInstructions(b)}
+                          className="p-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                          title="Copia istruzioni check-in"
+                        >
+                          {copiedId === 'instructions-' + b.guest_token ? (
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          ) : (
+                            <MapPin className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <a
+                          href={getGuestLink(b.guest_token)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-primary-600 transition-colors"
+                          title="Apri form ospiti"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
                     </td>
                   </tr>
                 ))}

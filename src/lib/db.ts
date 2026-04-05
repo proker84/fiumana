@@ -110,12 +110,62 @@ async function initializeDb(db: Client) {
         letto INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS cleaning_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        access_token TEXT UNIQUE NOT NULL,
+        name TEXT DEFAULT 'Staff Pulizie',
+        active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS cleaning_schedules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_id INTEGER NOT NULL,
+        scheduled_date DATE,
+        scheduled_time TEXT,
+        status TEXT DEFAULT 'pending',
+        started_at DATETIME,
+        completed_at DATETIME,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (booking_id) REFERENCES bookings(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS cleaning_photos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cleaning_id INTEGER NOT NULL,
+        photo_url TEXT NOT NULL,
+        photo_type TEXT DEFAULT 'post',
+        caption TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (cleaning_id) REFERENCES cleaning_schedules(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS cleaning_issues (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cleaning_id INTEGER NOT NULL,
+        issue_type TEXT NOT NULL,
+        description TEXT NOT NULL,
+        urgency TEXT DEFAULT 'media',
+        photo_url TEXT,
+        resolved INTEGER DEFAULT 0,
+        resolved_at DATETIME,
+        resolved_notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (cleaning_id) REFERENCES cleaning_schedules(id)
+      );
     `);
 
     // Create indexes
     await db.execute('CREATE INDEX IF NOT EXISTS idx_bookings_token ON bookings(guest_token)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_bookings_checkin ON bookings(check_in)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_guests_booking ON guests(booking_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_cleaning_schedules_booking ON cleaning_schedules(booking_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_cleaning_photos_cleaning ON cleaning_photos(cleaning_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_cleaning_issues_cleaning ON cleaning_issues(cleaning_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_cleaning_config_token ON cleaning_config(access_token)');
 
     // Create default admin if not exists
     const adminExists = await db.execute('SELECT COUNT(*) as count FROM admin_users');
