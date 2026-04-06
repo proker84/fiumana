@@ -107,6 +107,15 @@ const COUNTRY_LABELS: Record<string, string> = {
 
 const getCountryName = (code: string) => COUNTRY_LABELS[code] || code;
 
+function formatDateIT(dateStr: string): string {
+  if (!dateStr) return '-';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+}
+
 export default function BookingDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -414,14 +423,14 @@ export default function BookingDetailPage() {
               <span className="text-xs text-gray-400 uppercase tracking-wider">Check-in</span>
               <p className="font-medium text-gray-900 mt-1 flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-primary-500" />
-                {booking.check_in}
+                {formatDateIT(booking.check_in)}
               </p>
             </div>
             <div>
               <span className="text-xs text-gray-400 uppercase tracking-wider">Check-out</span>
               <p className="font-medium text-gray-900 mt-1 flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-gray-400" />
-                {booking.check_out}
+                {formatDateIT(booking.check_out)}
               </p>
             </div>
             <div>
@@ -538,7 +547,7 @@ export default function BookingDetailPage() {
                     </div>
                     <div>
                       <span className="text-xs text-gray-400">Data di nascita</span>
-                      <p className="text-gray-700">{guest.data_nascita}</p>
+                      <p className="text-gray-700">{formatDateIT(guest.data_nascita)}</p>
                     </div>
                     <div>
                       <span className="text-xs text-gray-400">Luogo di nascita</span>
@@ -644,7 +653,7 @@ export default function BookingDetailPage() {
                 <div>
                   <p className="font-medium text-gray-900">ID: {receipt.receipt_id}</p>
                   <p className="text-sm text-gray-500">
-                    {receipt.send_date} • {receipt.schedine_count} schedine • {receipt.permanenza_days} giorni • Questura {receipt.questura}
+                    {formatDateIT(receipt.send_date)} • {receipt.schedine_count} schedine • {receipt.permanenza_days} giorni • Questura {receipt.questura}
                   </p>
                 </div>
               </div>
@@ -907,7 +916,7 @@ export default function BookingDetailPage() {
 
               <div className="bg-gray-50 rounded-xl p-4 mb-4">
                 <p className="text-sm text-gray-600 mb-2"><strong>Prenotazione:</strong> {booking.booking_id}</p>
-                <p className="text-sm text-gray-600 mb-2"><strong>Check-in:</strong> {booking.check_in}</p>
+                <p className="text-sm text-gray-600 mb-2"><strong>Check-in:</strong> {formatDateIT(booking.check_in)}</p>
                 <p className="text-sm text-gray-600"><strong>Ospiti:</strong> {guests.map(g => `${g.nome} ${g.cognome}`).join(', ')}</p>
               </div>
 
