@@ -156,6 +156,20 @@ async function initializeDb(db: Client) {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (cleaning_id) REFERENCES cleaning_schedules(id)
       );
+
+      CREATE TABLE IF NOT EXISTS alloggiati_receipts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_id INTEGER NOT NULL,
+        receipt_id TEXT NOT NULL,
+        send_date DATE NOT NULL,
+        schedine_count INTEGER DEFAULT 1,
+        permanenza_days INTEGER DEFAULT 1,
+        questura TEXT DEFAULT 'FERRARA',
+        pdf_url TEXT,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (booking_id) REFERENCES bookings(id)
+      );
     `);
 
     // Create indexes
@@ -166,6 +180,7 @@ async function initializeDb(db: Client) {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_cleaning_photos_cleaning ON cleaning_photos(cleaning_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_cleaning_issues_cleaning ON cleaning_issues(cleaning_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_cleaning_config_token ON cleaning_config(access_token)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_alloggiati_receipts_booking ON alloggiati_receipts(booking_id)');
 
     // Create default admin if not exists
     const adminExists = await db.execute('SELECT COUNT(*) as count FROM admin_users');

@@ -21,6 +21,8 @@ import {
   X,
   AlertTriangle,
   Trash2,
+  Upload,
+  Receipt,
 } from 'lucide-react';
 
 interface Guest {
@@ -54,6 +56,17 @@ interface Booking {
   alloggiati_sent: number;
   platform: string;
   correction_note: string | null;
+}
+
+interface AlloggiatiReceipt {
+  id: number;
+  receipt_id: string;
+  send_date: string;
+  schedine_count: number;
+  permanenza_days: number;
+  questura: string;
+  pdf_url: string;
+  created_at: string;
 }
 
 const TIPO_ALLOGGIATO_LABELS: Record<string, string> = {
@@ -120,8 +133,22 @@ export default function BookingDetailPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Receipt state
+  const [receipts, setReceipts] = useState<AlloggiatiReceipt[]>([]);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [receiptForm, setReceiptForm] = useState({
+    receipt_id: '',
+    send_date: '',
+    schedine_count: '1',
+    permanenza_days: '1',
+    questura: 'FERRARA',
+  });
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+
   useEffect(() => {
     fetchBookingDetails();
+    fetchReceipts();
   }, [bookingId]);
 
   async function fetchBookingDetails() {
@@ -139,6 +166,64 @@ export default function BookingDetailPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchReceipts() {
+    try {
+      const token = document.cookie.split('; ').find(c => c.startsWith('auth_token='))?.split('=')[1];
+      const res = await fetch(`/api/bookings/${bookingId}/receipt`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReceipts(data.receipts || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function uploadReceipt() {
+    if (!receiptFile || !receiptForm.receipt_id || !receiptForm.send_date) return;
+
+    setUploadingReceipt(true);
+    try {
+      const token = document.cookie.split('; ').find(c => c.startsWith('auth_token='))?.split('=')[1];
+      const formData = new FormData();
+      formData.append('file', receiptFile);
+      formData.append('receipt_id', receiptForm.receipt_id);
+      formData.append('send_date', receiptForm.send_date);
+      formData.append('schedine_count', receiptForm.schedine_count);
+      formData.append('permanenza_days', receiptForm.permanenza_days);
+      formData.append('questura', receiptForm.questura);
+
+      const res = await fetch(`/api/bookings/${bookingId}/receipt`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      if (res.ok) {
+        setShowReceiptModal(false);
+        setReceiptFile(null);
+        setReceiptForm({
+          receipt_id: '',
+          send_date: '',
+          schedine_count: '1',
+          permanenza_days: '1',
+          questura: 'FERRARA',
+        });
+        fetchReceipts();
+        fetchBookingDetails();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Errore nel caricamento');
+      }
+    } catch (err) {
+      alert('Errore di connessione');
+    } finally {
+      setUploadingReceipt(false);
     }
   }
 
@@ -522,6 +607,205 @@ export default function BookingDetailPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Receipts Section */}
+      <div className="mt-8 mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <Receipt className="w-5 h-5 text-green-500" />
+          Ricevute Alloggiati ({receipts.length})
+        </h2>
+        <button
+          onClick={() => setShowReceiptModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+        >
+          <Upload className="w-4 h-4" />
+          Carica Ricevuta
+        </button>
+      </div>
+
+      {receipts.length === 0 ? (
+        <div className="admin-card text-center py-8">
+          <Receipt className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+          <p className="text-gray-500 text-sm">Nessuna ricevuta caricata</p>
+          <p className="text-xs text-gray-400 mt-1">
+            Carica il PDF della ricevuta del Portale Alloggiati
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {receipts.map((receipt) => (
+            <div key={receipt.id} className="admin-card flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">ID: {receipt.receipt_id}</p>
+                  <p className="text-sm text-gray-500">
+                    {receipt.send_date} • {receipt.schedine_count} schedine • {receipt.permanenza_days} giorni • Questura {receipt.questura}
+                  </p>
+                </div>
+              </div>
+              <a
+                href={receipt.pdf_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+              >
+                <Download className="w-4 h-4" />
+                Scarica PDF
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Receipt Upload Modal */}
+      {showReceiptModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Upload className="w-5 h-5 text-green-500" />
+                Carica Ricevuta Alloggiati
+              </h3>
+              <button
+                onClick={() => {
+                  setShowReceiptModal(false);
+                  setReceiptFile(null);
+                }}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ID Ricevuta *
+                </label>
+                <input
+                  type="text"
+                  value={receiptForm.receipt_id}
+                  onChange={(e) => setReceiptForm({ ...receiptForm, receipt_id: e.target.value })}
+                  placeholder="Es: 2025/54318 [FE]"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 outline-none text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Data Invio *
+                  </label>
+                  <input
+                    type="date"
+                    value={receiptForm.send_date}
+                    onChange={(e) => setReceiptForm({ ...receiptForm, send_date: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Questura
+                  </label>
+                  <input
+                    type="text"
+                    value={receiptForm.questura}
+                    onChange={(e) => setReceiptForm({ ...receiptForm, questura: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 outline-none text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Schedine Inviate
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={receiptForm.schedine_count}
+                    onChange={(e) => setReceiptForm({ ...receiptForm, schedine_count: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Giorni Permanenza
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={receiptForm.permanenza_days}
+                    onChange={(e) => setReceiptForm({ ...receiptForm, permanenza_days: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 outline-none text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  File PDF *
+                </label>
+                <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center">
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                    className="hidden"
+                    id="receipt-file"
+                  />
+                  <label htmlFor="receipt-file" className="cursor-pointer">
+                    {receiptFile ? (
+                      <div className="flex items-center justify-center gap-2 text-green-600">
+                        <FileText className="w-5 h-5" />
+                        <span className="text-sm font-medium">{receiptFile.name}</span>
+                      </div>
+                    ) : (
+                      <div className="text-gray-400">
+                        <Upload className="w-8 h-8 mx-auto mb-2" />
+                        <p className="text-sm">Clicca per selezionare il PDF</p>
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 p-5 border-t border-gray-100">
+              <button
+                onClick={() => {
+                  setShowReceiptModal(false);
+                  setReceiptFile(null);
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={uploadReceipt}
+                disabled={!receiptFile || !receiptForm.receipt_id || !receiptForm.send_date || uploadingReceipt}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-green-600 text-white hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {uploadingReceipt ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Caricamento...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    Carica Ricevuta
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
