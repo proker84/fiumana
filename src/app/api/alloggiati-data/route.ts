@@ -93,7 +93,8 @@ export async function GET(req: NextRequest) {
 
     case 'province': {
       // Get unique province
-      const province = [...new Set(comuni.map(c => c.provincia))].sort();
+      const provinceSet = new Set(comuni.map(c => c.provincia));
+      const province = Array.from(provinceSet).sort();
       return NextResponse.json({ province });
     }
 
