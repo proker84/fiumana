@@ -89,34 +89,64 @@ export interface AlloggiatiCredentials {
 /**
  * Generates the fixed-length text format required by Portale Alloggiati
  * for batch file upload (alternative to SOAP submission)
+ *
+ * Format (from official questura file):
+ * - Tipo alloggiato: 2 char (18=capofamiglia, 19=familiare, 20=membro gruppo, 16=singolo)
+ * - Data arrivo: 10 char (dd/MM/yyyy)
+ * - Giorni permanenza: 2 char
+ * - Cognome: 50 char (padded)
+ * - Nome: 30 char (padded)
+ * - Sesso: 1 char (1=M, 2=F)
+ * - Data nascita: 10 char (dd/MM/yyyy)
+ * - Comune nascita: 9 char (codice ISTAT)
+ * - Provincia nascita: 2 char
+ * - Stato nascita: 9 char (codice)
+ * - Cittadinanza: 9 char (codice)
+ * - Tipo documento: 5 char (IDENT, PASOR, etc.) - vuoto se familiare
+ * - Numero documento: 20 char - vuoto se familiare
+ * - Luogo rilascio: 9 char (provincia + spazi o codice autorità) - vuoto se familiare
+ * - Codice comune rilascio: 9 char (codice ISTAT) - vuoto se familiare
  */
 export function generateAlloggiatiTextRecord(
   guest: GuestData,
   dataArrivo: string,
   giorniPermanenza: number,
 ): string {
-  const pad = (str: string, len: number) => str.padEnd(len).substring(0, len);
+  const pad = (str: string, len: number) => (str || '').toUpperCase().padEnd(len).substring(0, len);
   const padNum = (num: number, len: number) => String(num).padStart(len, '0');
 
-  // Format: Tipo|Arrivo|Permanenza|Cognome|Nome|Sesso|Nascita|Stato|Cittadinanza|DocTipo|DocNum|DocRilascio
-  const arrivo = new Date(dataArrivo);
-  const nascita = new Date(guest.dataNascita);
+  // Parse dates - handle both yyyy-MM-dd and other formats
+  const parseDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return {
+      day: padNum(d.getDate(), 2),
+      month: padNum(d.getMonth() + 1, 2),
+      year: d.getFullYear(),
+    };
+  };
+
+  const arrivo = parseDate(dataArrivo);
+  const nascita = parseDate(guest.dataNascita);
+
+  // Check if this guest needs document info (capofamiglia/capogruppo/singolo have documents, familiari don't)
+  const needsDocument = ['16', '17', '18'].includes(guest.tipoAlloggiato);
 
   const record = [
-    guest.tipoAlloggiato.padStart(2, '0'),
-    `${padNum(arrivo.getDate(), 2)}/${padNum(arrivo.getMonth() + 1, 2)}/${arrivo.getFullYear()}`,
-    padNum(giorniPermanenza, 2),
-    pad(guest.cognome.toUpperCase(), 50),
-    pad(guest.nome.toUpperCase(), 30),
-    guest.sesso === 'M' ? '1' : '2',
-    `${padNum(nascita.getDate(), 2)}/${padNum(nascita.getMonth() + 1, 2)}/${nascita.getFullYear()}`,
-    pad(guest.comuneNascita?.toUpperCase() || '', 9),
-    pad(guest.provinciaNascita?.toUpperCase() || '', 2),
-    pad(guest.statoNascita, 9),
-    pad(guest.cittadinanza, 9),
-    pad(guest.tipoDocumento, 5),
-    pad(guest.numeroDocumento.toUpperCase(), 20),
-    pad(guest.luogoRilascio.toUpperCase(), 9),
+    guest.tipoAlloggiato.padStart(2, '0'),                                    // 2: Tipo alloggiato
+    `${arrivo.day}/${arrivo.month}/${arrivo.year}`,                          // 10: Data arrivo
+    padNum(giorniPermanenza, 2),                                              // 2: Giorni permanenza
+    pad(guest.cognome, 50),                                                   // 50: Cognome
+    pad(guest.nome, 30),                                                      // 30: Nome
+    guest.sesso === 'M' ? '1' : '2',                                         // 1: Sesso
+    `${nascita.day}/${nascita.month}/${nascita.year}`,                       // 10: Data nascita
+    pad(guest.comuneNascita || '', 9),                                        // 9: Comune nascita (codice ISTAT)
+    pad(guest.provinciaNascita || '', 2),                                     // 2: Provincia nascita
+    pad(guest.statoNascita, 9),                                               // 9: Stato nascita
+    pad(guest.cittadinanza, 9),                                               // 9: Cittadinanza
+    needsDocument ? pad(guest.tipoDocumento, 5) : '     ',                    // 5: Tipo documento
+    needsDocument ? pad(guest.numeroDocumento, 20) : '                    ',  // 20: Numero documento
+    needsDocument ? pad(guest.luogoRilascio, 9) : '         ',               // 9: Luogo rilascio (sigla prov o codice)
+    needsDocument ? pad(guest.luogoRilascio, 9) : '         ',               // 9: Codice comune rilascio (duplicato o diverso?)
   ].join('');
 
   return record;
