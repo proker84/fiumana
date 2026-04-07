@@ -235,85 +235,110 @@ function generateAlloggiatiTXT(booking: Booking, guests: Guest[]): string {
 }
 
 /**
- * Generate ROSS1000 XML format for ISTAT statistics
+ * Generate ROSS1000 XML format for ISTAT statistics (Emilia-Romagna)
+ * Formato conforme al tracciato GIES versione 3 del 18/03/2026
  */
 function generateRoss1000XML(booking: Booking, guests: Guest[]): string {
+  // Codice struttura CIR - TODO: rendere configurabile
+  const codiceStruttura = '038006-CV-00255';
+  const prodotto = 'ImmobiliareFiumana';
+
   const checkIn = new Date(booking.check_in);
   const checkOut = new Date(booking.check_out);
   const giorni = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
 
-  // Group guests by nationality for statistics
-  const italiani = guests.filter(g => g.cittadinanza === '100000100');
-  const stranieri = guests.filter(g => g.cittadinanza !== '100000100');
+  // Find capogruppo (tipo 17 o 18) for idcapo reference
+  const capogruppo = guests.find(g => g.tipo_alloggiato === '17' || g.tipo_alloggiato === '18');
+  const idCapo = capogruppo ? `${booking.id}-${capogruppo.id}` : '';
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
-<MovimentoTuristico xmlns="http://ross1000.regione.emilia-romagna.it/schema">
-  <Testata>
-    <DataRiferimento>${formatDateRoss(booking.check_in)}</DataRiferimento>
-    <TipoMovimento>A</TipoMovimento>
-  </Testata>
-  <Movimenti>`;
+<movimenti>
+  <codice>${codiceStruttura}</codice>
+  <prodotto>${prodotto}</prodotto>`;
 
-  guests.forEach((guest, index) => {
+  // Generate a movimento for each day of the stay
+  for (let day = 0; day <= giorni; day++) {
+    const currentDate = new Date(checkIn);
+    currentDate.setDate(checkIn.getDate() + day);
+    const dateStr = formatDateRoss(currentDate.toISOString().split('T')[0]);
+
+    const isArrivalDay = day === 0;
+    const isDepartureDay = day === giorni;
+    const isStayDay = day > 0 && day < giorni;
+
+    // Camere occupate: 1 durante il soggiorno, 0 il giorno di partenza
+    const camereOccupate = isDepartureDay ? 0 : 1;
+
     xml += `
-    <Movimento>
-      <Progressivo>${index + 1}</Progressivo>
-      <DataArrivo>${formatDateRoss(guest.data_arrivo || booking.check_in)}</DataArrivo>
-      <DataPartenza>${formatDateRoss(booking.check_out)}</DataPartenza>
-      <TipoAlloggiato>${getTipoAlloggiatoRoss(guest.tipo_alloggiato)}</TipoAlloggiato>
-      <Cognome>${escapeXml(guest.cognome.toUpperCase())}</Cognome>
-      <Nome>${escapeXml(guest.nome.toUpperCase())}</Nome>
-      <Sesso>${guest.sesso}</Sesso>
-      <DataNascita>${formatDateRoss(guest.data_nascita)}</DataNascita>
-      <LuogoNascita>
-        <Stato>${guest.stato_nascita}</Stato>
-        ${guest.stato_nascita === '100000100' ? `<Comune>${guest.comune_nascita_codice || ''}</Comune>
-        <Provincia>${guest.provincia_nascita || ''}</Provincia>` : ''}
-      </LuogoNascita>
-      <Cittadinanza>${guest.cittadinanza}</Cittadinanza>
-      <Residenza>
-        <Stato>${guest.stato_residenza || guest.cittadinanza}</Stato>
-        ${(guest.stato_residenza || guest.cittadinanza) === '100000100' ? `<Comune>${guest.comune_residenza_codice || ''}</Comune>
-        <Provincia>${guest.provincia_residenza || ''}</Provincia>` : ''}
-        <Indirizzo>${escapeXml(guest.indirizzo_residenza || '')}</Indirizzo>
-      </Residenza>
-      <Documento>
-        <Tipo>${guest.tipo_documento}</Tipo>
-        <Numero>${escapeXml(guest.numero_documento.toUpperCase())}</Numero>
-        <StatoRilascio>${guest.stato_rilascio || guest.cittadinanza}</StatoRilascio>
-        <LuogoRilascio>${guest.comune_rilascio_codice || guest.luogo_rilascio || ''}</LuogoRilascio>
-      </Documento>
-      <Permanenza>
-        <Notti>${guest.giorni_permanenza || giorni}</Notti>
-        <CamereOccupate>${guest.camere_occupate || 1}</CamereOccupate>
-      </Permanenza>
-    </Movimento>`;
-  });
+  <movimento>
+    <data>${dateStr}</data>
+    <struttura>
+      <apertura>SI</apertura>
+      <camereoccupate>${camereOccupate}</camereoccupate>
+      <cameredisponibili>1</cameredisponibili>
+      <lettidisponibili>3</lettidisponibili>
+    </struttura>`;
+
+    // Arrivi solo il primo giorno
+    if (isArrivalDay) {
+      xml += `
+    <arrivi>`;
+      guests.forEach((guest) => {
+        const guestId = `${booking.id}-${guest.id}`;
+        const needsIdCapo = guest.tipo_alloggiato === '19' || guest.tipo_alloggiato === '20';
+        const luogoResidenza = guest.stato_residenza === '100000100'
+          ? (guest.comune_residenza_codice || '')
+          : (guest.luogo_rilascio || guest.comune_residenza || '');
+
+        xml += `
+      <arrivo>
+        <idswh>${guestId}</idswh>
+        <tipoalloggiato>${guest.tipo_alloggiato || '16'}</tipoalloggiato>
+        <idcapo>${needsIdCapo ? idCapo : ''}</idcapo>
+        <sesso>${guest.sesso}</sesso>
+        <cittadinanza>${guest.cittadinanza}</cittadinanza>
+        <statoresidenza>${guest.stato_residenza || guest.cittadinanza}</statoresidenza>
+        <luogoresidenza>${escapeXml(luogoResidenza)}</luogoresidenza>
+        <datanascita>${formatDateRoss(guest.data_nascita)}</datanascita>
+        <statonascita>${guest.stato_nascita}</statonascita>
+        <comunenascita>${guest.stato_nascita === '100000100' ? (guest.comune_nascita_codice || '') : ''}</comunenascita>
+        <tipoturismo>Balneare</tipoturismo>
+        <mezzotrasporto>Auto</mezzotrasporto>
+        <canaleprenotazione>Indiretta web</canaleprenotazione>
+        <titolostudio></titolostudio>
+        <professione></professione>
+        <esenzioneimposta></esenzioneimposta>
+      </arrivo>`;
+      });
+      xml += `
+    </arrivi>`;
+    }
+
+    // Partenze solo l'ultimo giorno
+    if (isDepartureDay) {
+      xml += `
+    <partenze>`;
+      guests.forEach((guest) => {
+        const guestId = `${booking.id}-${guest.id}`;
+        xml += `
+      <partenza>
+        <idswh>${guestId}</idswh>
+        <tipoalloggiato>${guest.tipo_alloggiato || '16'}</tipoalloggiato>
+        <arrivo>${formatDateRoss(booking.check_in)}</arrivo>
+      </partenza>`;
+      });
+      xml += `
+    </partenze>`;
+    }
+
+    xml += `
+  </movimento>`;
+  }
 
   xml += `
-  </Movimenti>
-  <Riepilogo>
-    <TotaleArrivi>${guests.length}</TotaleArrivi>
-    <TotalePresenze>${guests.length * giorni}</TotalePresenze>
-    <ArriviItaliani>${italiani.length}</ArriviItaliani>
-    <ArriviStranieri>${stranieri.length}</ArriviStranieri>
-    <PresenzeItaliani>${italiani.length * giorni}</PresenzeItaliani>
-    <PresenzeStranieri>${stranieri.length * giorni}</PresenzeStranieri>
-  </Riepilogo>
-</MovimentoTuristico>`;
+</movimenti>`;
 
   return xml;
-}
-
-function getTipoAlloggiatoRoss(tipo: string): string {
-  const map: Record<string, string> = {
-    '16': 'SINGOLO',
-    '17': 'CAPOFAMIGLIA',
-    '18': 'CAPOGRUPPO',
-    '19': 'FAMILIARE',
-    '20': 'MEMBRO_GRUPPO',
-  };
-  return map[tipo] || 'SINGOLO';
 }
 
 function escapeXml(str: string): string {
