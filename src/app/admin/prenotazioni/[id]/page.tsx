@@ -23,6 +23,7 @@ import {
   Trash2,
   Upload,
   Receipt,
+  FileDown,
 } from 'lucide-react';
 
 interface Guest {
@@ -501,6 +502,37 @@ export default function BookingDetailPage() {
                 Invia al Portale Alloggiati
               </button>
             )}
+          </div>
+        )}
+
+        {/* Export Buttons */}
+        {guests.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-4">
+            <span className="text-xs text-gray-500 w-full mb-1">Esporta dati:</span>
+            <a
+              href={`/api/bookings/${booking.id}/export?format=alloggiati`}
+              download
+              className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs font-medium"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              XML Alloggiati
+            </a>
+            <a
+              href={`/api/bookings/${booking.id}/export?format=txt`}
+              download
+              className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs font-medium"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              TXT Alloggiati
+            </a>
+            <a
+              href={`/api/bookings/${booking.id}/export?format=ross1000`}
+              download
+              className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              XML ROSS1000 (ISTAT)
+            </a>
           </div>
         )}
       </div>
