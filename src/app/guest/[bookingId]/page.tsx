@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { Language, languages, getTranslation } from '@/lib/translations';
+import ComuneSelect from '@/components/ComuneSelect';
 
 interface GuestForm {
   id: number;
@@ -29,11 +30,22 @@ interface GuestForm {
   sesso: string;
   data_nascita: string;
   comune_nascita: string;
+  comune_nascita_codice: string;
   provincia_nascita: string;
   stato_nascita: string;
   cittadinanza: string;
+  // Residenza
+  stato_residenza: string;
+  comune_residenza: string;
+  comune_residenza_codice: string;
+  provincia_residenza: string;
+  indirizzo_residenza: string;
+  // Documento
   tipo_documento: string;
   numero_documento: string;
+  stato_rilascio: string;
+  comune_rilascio: string;
+  comune_rilascio_codice: string;
   luogo_rilascio: string;
   documento_fronte: string;
   documento_retro: string;
@@ -78,11 +90,22 @@ const emptyGuest = (): GuestForm => ({
   sesso: '',
   data_nascita: '',
   comune_nascita: '',
+  comune_nascita_codice: '',
   provincia_nascita: '',
   stato_nascita: '100000100',
   cittadinanza: '100000100',
+  // Residenza
+  stato_residenza: '100000100',
+  comune_residenza: '',
+  comune_residenza_codice: '',
+  provincia_residenza: '',
+  indirizzo_residenza: '',
+  // Documento
   tipo_documento: 'IDENT',
   numero_documento: '',
+  stato_rilascio: '100000100',
+  comune_rilascio: '',
+  comune_rilascio_codice: '',
   luogo_rilascio: '',
   documento_fronte: '',
   documento_retro: '',
@@ -197,7 +220,20 @@ export default function GuestPage() {
       if (!g.cittadinanza) guestErrors.push(t('citizenshipRequired'));
       if (!g.tipo_documento) guestErrors.push(t('documentTypeRequired'));
       if (!g.numero_documento.trim()) guestErrors.push(t('documentNumberRequired'));
-      if (!g.luogo_rilascio.trim()) guestErrors.push(t('placeOfIssueRequired'));
+      // Residenza
+      if (!g.stato_residenza) guestErrors.push(t('countryOfResidenceRequired') || 'Stato residenza richiesto');
+      if (g.stato_residenza === '100000100' && !g.comune_residenza.trim()) {
+        guestErrors.push(t('cityOfResidenceRequired') || 'Comune residenza richiesto');
+      }
+      if (!g.indirizzo_residenza.trim()) guestErrors.push(t('addressRequired') || 'Indirizzo richiesto');
+
+      // Documento
+      if (!g.stato_rilascio) guestErrors.push(t('countryOfIssueRequired') || 'Stato rilascio richiesto');
+      if (g.stato_rilascio === '100000100' && !g.comune_rilascio.trim()) {
+        guestErrors.push(t('placeOfIssueRequired') || 'Comune rilascio richiesto');
+      } else if (g.stato_rilascio !== '100000100' && !g.luogo_rilascio.trim()) {
+        guestErrors.push(t('placeOfIssueRequired'));
+      }
 
       if (g.stato_nascita === '100000100') {
         if (!g.comune_nascita.trim()) guestErrors.push(t('cityOfBirthRequiredItaly'));
@@ -609,32 +645,74 @@ export default function GuestPage() {
 
                   {/* Italian-specific fields */}
                   {guest.stato_nascita === '100000100' && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                          {t('cityOfBirth')} *
-                        </label>
-                        <input
-                          type="text" value={guest.comune_nascita}
-                          onChange={(e) => updateGuest(guest.id, 'comune_nascita', e.target.value)}
-                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm"
-                          placeholder="Roma"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                          {t('provinceOfBirth')}
-                        </label>
-                        <input
-                          type="text" value={guest.provincia_nascita}
-                          onChange={(e) => updateGuest(guest.id, 'provincia_nascita', e.target.value)}
-                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm"
-                          placeholder="RM"
-                          maxLength={2}
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                        {t('cityOfBirth')} *
+                      </label>
+                      <ComuneSelect
+                        value={guest.comune_nascita}
+                        valueCodice={guest.comune_nascita_codice}
+                        onChange={(nome, codice, prov) => {
+                          updateGuest(guest.id, 'comune_nascita', nome);
+                          updateGuest(guest.id, 'comune_nascita_codice', codice);
+                          updateGuest(guest.id, 'provincia_nascita', prov);
+                        }}
+                        placeholder={t('searchCity') || 'Cerca comune...'}
+                      />
                     </div>
                   )}
+
+                  {/* Residenza */}
+                  <div className="pt-3 border-t border-gray-100">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-4">
+                      {t('residence') || 'Residenza'}
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                          {t('countryOfResidence') || 'Stato Residenza'} *
+                        </label>
+                        <select
+                          value={guest.stato_residenza}
+                          onChange={(e) => updateGuest(guest.id, 'stato_residenza', e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm bg-white"
+                        >
+                          {COMMON_COUNTRIES.map((c) => (
+                            <option key={c.code} value={c.code}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {guest.stato_residenza === '100000100' && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                            {t('cityOfResidence') || 'Comune Residenza'} *
+                          </label>
+                          <ComuneSelect
+                            value={guest.comune_residenza}
+                            valueCodice={guest.comune_residenza_codice}
+                            onChange={(nome, codice, prov) => {
+                              updateGuest(guest.id, 'comune_residenza', nome);
+                              updateGuest(guest.id, 'comune_residenza_codice', codice);
+                              updateGuest(guest.id, 'provincia_residenza', prov);
+                            }}
+                            placeholder={t('searchCity') || 'Cerca comune...'}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                        {t('addressOfResidence') || 'Indirizzo'} *
+                      </label>
+                      <input
+                        type="text"
+                        value={guest.indirizzo_residenza}
+                        onChange={(e) => updateGuest(guest.id, 'indirizzo_residenza', e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm"
+                        placeholder="Via Roma 1"
+                      />
+                    </div>
+                  </div>
 
                   {/* Document Info */}
                   <div className="pt-3 border-t border-gray-100">
@@ -669,16 +747,51 @@ export default function GuestPage() {
                         />
                       </div>
                     </div>
-                    <div className="mt-4">
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                        {t('placeOfIssue')} *
-                      </label>
-                      <input
-                        type="text" value={guest.luogo_rilascio}
-                        onChange={(e) => updateGuest(guest.id, 'luogo_rilascio', e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm"
-                        placeholder="Roma"
-                      />
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                          {t('countryOfIssue') || 'Stato Rilascio'} *
+                        </label>
+                        <select
+                          value={guest.stato_rilascio}
+                          onChange={(e) => updateGuest(guest.id, 'stato_rilascio', e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm bg-white"
+                        >
+                          {COMMON_COUNTRIES.map((c) => (
+                            <option key={c.code} value={c.code}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {guest.stato_rilascio === '100000100' ? (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                            {t('placeOfIssue') || 'Comune Rilascio'} *
+                          </label>
+                          <ComuneSelect
+                            value={guest.comune_rilascio}
+                            valueCodice={guest.comune_rilascio_codice}
+                            onChange={(nome, codice, prov) => {
+                              updateGuest(guest.id, 'comune_rilascio', nome);
+                              updateGuest(guest.id, 'comune_rilascio_codice', codice);
+                              updateGuest(guest.id, 'luogo_rilascio', prov);
+                            }}
+                            placeholder={t('searchCity') || 'Cerca comune...'}
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                            {t('placeOfIssue')} *
+                          </label>
+                          <input
+                            type="text"
+                            value={guest.luogo_rilascio}
+                            onChange={(e) => updateGuest(guest.id, 'luogo_rilascio', e.target.value)}
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm"
+                            placeholder="City / Place"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {/* Document Upload Section */}

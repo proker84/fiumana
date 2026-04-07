@@ -62,29 +62,43 @@ export async function POST(req: NextRequest) {
     await dbExecute('DELETE FROM guests WHERE booking_id = ?', [booking.id]);
 
     // Insert each guest
-    for (const g of guests) {
+    for (let i = 0; i < guests.length; i++) {
+      const g = guests[i];
       await dbExecute(
         `INSERT INTO guests (
-          booking_id, tipo_alloggiato, cognome, nome, sesso, data_nascita,
-          comune_nascita, provincia_nascita, stato_nascita, cittadinanza,
-          tipo_documento, numero_documento, luogo_rilascio,
+          booking_id, progressivo, tipo_alloggiato, camere_occupate,
+          cognome, nome, sesso, data_nascita,
+          comune_nascita, comune_nascita_codice, provincia_nascita, stato_nascita, cittadinanza,
+          stato_residenza, comune_residenza, comune_residenza_codice, provincia_residenza, indirizzo_residenza,
+          tipo_documento, numero_documento, stato_rilascio, comune_rilascio, comune_rilascio_codice, luogo_rilascio,
           documento_fronte, documento_retro,
           data_arrivo, giorni_permanenza
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           booking.id,
+          i + 1, // progressivo
           g.tipo_alloggiato || '16',
+          g.camere_occupate || 1,
           g.cognome.trim(),
           g.nome.trim(),
           g.sesso,
           g.data_nascita,
           g.comune_nascita?.trim() || null,
+          g.comune_nascita_codice || null,
           g.provincia_nascita?.trim() || null,
           g.stato_nascita,
           g.cittadinanza,
+          g.stato_residenza || '100000100',
+          g.comune_residenza?.trim() || null,
+          g.comune_residenza_codice || null,
+          g.provincia_residenza?.trim() || null,
+          g.indirizzo_residenza?.trim() || null,
           g.tipo_documento,
           g.numero_documento.trim(),
-          g.luogo_rilascio.trim(),
+          g.stato_rilascio || '100000100',
+          g.comune_rilascio?.trim() || null,
+          g.comune_rilascio_codice || null,
+          g.luogo_rilascio?.trim() || null,
           g.documento_fronte || null,
           g.documento_retro || null,
           booking.check_in,
