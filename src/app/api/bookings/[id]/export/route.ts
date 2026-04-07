@@ -58,19 +58,21 @@ export async function GET(
   const format = request.nextUrl.searchParams.get('format') || 'alloggiati';
 
   try {
-    const booking = await dbQueryOne(
+    const bookingRow = await dbQueryOne(
       'SELECT * FROM bookings WHERE id = ?',
       [params.id]
-    ) as Booking | null;
+    );
+    const booking = bookingRow as unknown as Booking | null;
 
     if (!booking) {
       return NextResponse.json({ error: 'Prenotazione non trovata' }, { status: 404 });
     }
 
-    const guests = await dbQuery(
+    const guestsRows = await dbQuery(
       'SELECT * FROM guests WHERE booking_id = ? ORDER BY progressivo ASC',
       [params.id]
-    ) as Guest[];
+    );
+    const guests = guestsRows as unknown as Guest[];
 
     if (guests.length === 0) {
       return NextResponse.json({ error: 'Nessun ospite registrato' }, { status: 400 });
