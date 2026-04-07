@@ -131,6 +131,11 @@ function formatDateISO(dateStr: string): string {
   return dateStr; // Already in YYYY-MM-DD format
 }
 
+function formatDateRoss(dateStr: string): string {
+  // ROSS1000 requires YYYYMMDD format (no separators)
+  return dateStr.replace(/-/g, '');
+}
+
 function pad(str: string | null | undefined, len: number): string {
   return (str || '').toUpperCase().padEnd(len).substring(0, len);
 }
@@ -244,7 +249,7 @@ function generateRoss1000XML(booking: Booking, guests: Guest[]): string {
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <MovimentoTuristico xmlns="http://ross1000.regione.emilia-romagna.it/schema">
   <Testata>
-    <DataRiferimento>${formatDateISO(booking.check_in)}</DataRiferimento>
+    <DataRiferimento>${formatDateRoss(booking.check_in)}</DataRiferimento>
     <TipoMovimento>A</TipoMovimento>
   </Testata>
   <Movimenti>`;
@@ -253,13 +258,13 @@ function generateRoss1000XML(booking: Booking, guests: Guest[]): string {
     xml += `
     <Movimento>
       <Progressivo>${index + 1}</Progressivo>
-      <DataArrivo>${formatDateISO(guest.data_arrivo || booking.check_in)}</DataArrivo>
-      <DataPartenza>${formatDateISO(booking.check_out)}</DataPartenza>
+      <DataArrivo>${formatDateRoss(guest.data_arrivo || booking.check_in)}</DataArrivo>
+      <DataPartenza>${formatDateRoss(booking.check_out)}</DataPartenza>
       <TipoAlloggiato>${getTipoAlloggiatoRoss(guest.tipo_alloggiato)}</TipoAlloggiato>
       <Cognome>${escapeXml(guest.cognome.toUpperCase())}</Cognome>
       <Nome>${escapeXml(guest.nome.toUpperCase())}</Nome>
       <Sesso>${guest.sesso}</Sesso>
-      <DataNascita>${formatDateISO(guest.data_nascita)}</DataNascita>
+      <DataNascita>${formatDateRoss(guest.data_nascita)}</DataNascita>
       <LuogoNascita>
         <Stato>${guest.stato_nascita}</Stato>
         ${guest.stato_nascita === '100000100' ? `<Comune>${guest.comune_nascita_codice || ''}</Comune>
