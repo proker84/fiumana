@@ -290,6 +290,11 @@ function generateRoss1000XML(booking: Booking, guests: Guest[]): string {
           ? (guest.comune_residenza_codice || '')
           : (guest.luogo_rilascio || guest.comune_residenza || '');
 
+        // Luogo rilascio documento: per italiani codice comune, per stranieri località
+        const luogoRilascio = guest.stato_rilascio === '100000100'
+          ? (guest.comune_rilascio_codice || '')
+          : (guest.luogo_rilascio || '');
+
         xml += `
       <arrivo>
         <idswh>${guestId}</idswh>
@@ -304,6 +309,10 @@ function generateRoss1000XML(booking: Booking, guests: Guest[]): string {
         <datanascita>${formatDateRoss(guest.data_nascita)}</datanascita>
         <statonascita>${guest.stato_nascita}</statonascita>
         <comunenascita>${guest.stato_nascita === '100000100' ? (guest.comune_nascita_codice || '') : ''}</comunenascita>
+        <tipodocumento>${guest.tipo_documento || ''}</tipodocumento>
+        <numdocumento>${escapeXml(guest.numero_documento?.toUpperCase() || '')}</numdocumento>
+        <statorilasciodoc>${guest.stato_rilascio || guest.cittadinanza}</statorilasciodoc>
+        <luogorilasciodoc>${escapeXml(luogoRilascio)}</luogorilasciodoc>
         <tipoturismo>Balneare</tipoturismo>
         <mezzotrasporto>Auto</mezzotrasporto>
         <canaleprenotazione>Indiretta web</canaleprenotazione>
