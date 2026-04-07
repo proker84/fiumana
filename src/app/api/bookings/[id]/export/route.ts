@@ -295,6 +295,8 @@ function generateRoss1000XML(booking: Booking, guests: Guest[]): string {
         <idswh>${guestId}</idswh>
         <tipoalloggiato>${guest.tipo_alloggiato || '16'}</tipoalloggiato>
         <idcapo>${needsIdCapo ? idCapo : ''}</idcapo>
+        <cognome>${escapeXml(guest.cognome.toUpperCase())}</cognome>
+        <nome>${escapeXml(guest.nome.toUpperCase())}</nome>
         <sesso>${guest.sesso}</sesso>
         <cittadinanza>${guest.cittadinanza}</cittadinanza>
         <statoresidenza>${guest.stato_residenza || guest.cittadinanza}</statoresidenza>
