@@ -214,6 +214,7 @@ export default function InvoiceDetailPage() {
   const [showSendConfirm, setShowSendConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [sending, setSending] = useState(false);
+  const [polling, setPolling] = useState(false);
 
   useEffect(() => {
     void load();
@@ -254,6 +255,25 @@ export default function InvoiceDetailPage() {
       setMessage({ type: 'error', text: e.message });
     } finally {
       setSending(false);
+    }
+  }
+
+  async function syncFromAcube() {
+    setPolling(true);
+    setMessage(null);
+    try {
+      const data = await apiFetch<{
+        invoice: InvoiceDetail;
+        acubeMarking: string;
+        sdiOutcome: string | null;
+        message: string;
+      }>(`/api/invoices/${id}/poll`, { method: 'POST', body: JSON.stringify({}) });
+      setMessage({ type: 'success', text: data.message });
+      void load();
+    } catch (e: any) {
+      setMessage({ type: 'error', text: e.message });
+    } finally {
+      setPolling(false);
     }
   }
 
@@ -325,13 +345,28 @@ export default function InvoiceDetailPage() {
             </button>
           )}
           {invoice.externalId && (
-            <button
-              onClick={load}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 text-sm font-medium"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Aggiorna
-            </button>
+            <>
+              <button
+                onClick={syncFromAcube}
+                disabled={polling}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-100 text-sm font-medium disabled:opacity-50"
+                title="Pulla lo stato direttamente da ACube (fallback se i webhook non arrivano)"
+              >
+                {polling ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                Sincronizza con ACube
+              </button>
+              <button
+                onClick={load}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 text-sm font-medium"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Aggiorna
+              </button>
+            </>
           )}
           {isDeletable(invoice.stato) && (
             <button
