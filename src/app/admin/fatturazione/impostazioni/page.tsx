@@ -100,6 +100,11 @@ export default function FatturazioneImpostazioniPage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
 
+  // Webhook secret state separato: generato localmente, mostrato in chiaro,
+  // poi salvato esplicitamente dall'admin con un bottone dedicato.
+  const [newWebhookSecret, setNewWebhookSecret] = useState('');
+  const [savingWebhookSecret, setSavingWebhookSecret] = useState(false);
+
   useEffect(() => {
     void fetchSettings();
   }, []);
@@ -161,26 +166,44 @@ export default function FatturazioneImpostazioniPage() {
     }
   }
 
-  function generateWebhookSecret() {
+  function generateWebhookSecretLocal() {
     const secret = generateRandomBase64Url(32);
-    setForm((f) => ({ ...f, ['webhookSecretMasked' as any]: undefined } as any));
-    // inviamo il secret in chiaro: la GET successiva lo masc hera
-    void apiFetch<{ settings: SettingsView }>('/api/invoices/settings', {
-      method: 'PATCH',
-      body: JSON.stringify({ webhookSecret: secret }),
-    })
-      .then((data) => {
-        setSettings(data.settings);
-        setMessage({
-          type: 'info',
-          text:
-            'Nuovo webhook secret generato. Copialo nei campi "Authentication token" delle 5 ApiConfiguration ACube: ' +
-            secret,
-        });
-        // mostriamo il secret una volta sola in chiaro nella UI
-        navigator.clipboard?.writeText(secret).catch(() => undefined);
-      })
-      .catch((e) => setMessage({ type: 'error', text: e.message }));
+    setNewWebhookSecret(secret);
+    setShowWebhookSecret(true);
+    // copia agli appunti per comodità (non bloccante)
+    navigator.clipboard?.writeText(secret).catch(() => undefined);
+    setMessage({
+      type: 'info',
+      text:
+        'Secret generato (copiato negli appunti). Verifica il valore qui sotto e poi clicca "Salva webhook secret".',
+    });
+  }
+
+  async function saveWebhookSecret() {
+    if (!newWebhookSecret) {
+      setMessage({ type: 'error', text: 'Genera prima un secret.' });
+      return;
+    }
+    setSavingWebhookSecret(true);
+    setMessage(null);
+    try {
+      const data = await apiFetch<{ settings: SettingsView }>('/api/invoices/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ webhookSecret: newWebhookSecret }),
+      });
+      setSettings(data.settings);
+      setMessage({
+        type: 'success',
+        text:
+          'Webhook secret salvato. Adesso usalo come "Authentication token" (con prefisso "Bearer ") nelle 5 ApiConfiguration ACube.',
+      });
+      // teniamo il valore in chiaro a video finché l'admin non chiude la pagina,
+      // così può copiarlo se l'aveva perso dagli appunti
+    } catch (e: any) {
+      setMessage({ type: 'error', text: e.message ?? 'Errore salvataggio' });
+    } finally {
+      setSavingWebhookSecret(false);
+    }
   }
 
   const tassaSoggiornoEur = useMemo(() => {
@@ -536,7 +559,9 @@ export default function FatturazioneImpostazioniPage() {
               {settings?.webhookSecretConfigured ? (
                 <div className="flex items-center gap-2 text-green-700 bg-green-50 px-3 py-2 rounded-lg text-sm">
                   <CheckCircle2 className="w-4 h-4" />
-                  <span className="font-mono">{settings.webhookSecretMasked}</span>
+                  <span className="font-mono">
+                    Configurato — {settings.webhookSecretMasked}
+                  </span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-gray-500 bg-gray-100 px-3 py-2 rounded-lg text-sm">
@@ -547,16 +572,79 @@ export default function FatturazioneImpostazioniPage() {
             </div>
           </div>
 
-          <button
-            onClick={generateWebhookSecret}
-            type="button"
-            className="flex items-center gap-2 px-4 py-2.5 border border-amber-300 bg-amber-50 text-amber-700 rounded-xl hover:bg-amber-100 transition-colors text-sm font-medium"
-          >
-            <RefreshCw className="w-4 h-4" />
-            {settings?.webhookSecretConfigured
-              ? 'Rigenera webhook secret (invalida quello vecchio)'
-              : 'Genera webhook secret'}
-          </button>
+          {/* Campo input con secret in chiaro */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Nuovo webhook secret
+            </label>
+            <div className="relative">
+              <input
+                type={showWebhookSecret ? 'text' : 'password'}
+                value={newWebhookSecret}
+                onChange={(e) => setNewWebhookSecret(e.target.value)}
+                placeholder="Click 'Genera' per crearne uno nuovo, oppure incolla un valore esistente"
+                className="w-full px-4 py-2.5 pr-24 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none font-mono text-sm"
+              />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {newWebhookSecret && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigator.clipboard?.writeText(newWebhookSecret).catch(() => undefined)
+                      }
+                      className="p-1.5 text-gray-400 hover:text-gray-700"
+                      title="Copia"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowWebhookSecret((v) => !v)}
+                      className="p-1.5 text-gray-400 hover:text-gray-700"
+                    >
+                      {showWebhookSecret ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              Salvato cifrato nel DB. Il valore in chiaro è visibile solo finché non
+              esci da questa pagina — copialo subito.
+            </p>
+          </div>
+
+          {/* Bottoni Genera + Salva */}
+          <div className="flex gap-2">
+            <button
+              onClick={generateWebhookSecretLocal}
+              type="button"
+              className="flex items-center gap-2 px-4 py-2.5 border border-amber-300 bg-amber-50 text-amber-700 rounded-xl hover:bg-amber-100 transition-colors text-sm font-medium"
+            >
+              <RefreshCw className="w-4 h-4" />
+              {settings?.webhookSecretConfigured
+                ? 'Rigenera (non salva)'
+                : 'Genera (non salva)'}
+            </button>
+            <button
+              onClick={saveWebhookSecret}
+              type="button"
+              disabled={!newWebhookSecret || savingWebhookSecret}
+              className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {savingWebhookSecret ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              Salva webhook secret
+            </button>
+          </div>
         </div>
       </div>
 
