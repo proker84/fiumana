@@ -34,6 +34,65 @@ export async function GET(
   }
 }
 
+/**
+ * PATCH /api/bookings/[id]
+ * Aggiorna alcuni campi della prenotazione utili per la fatturazione:
+ *   - city_tax_amount: tassa di soggiorno totale (in euro) — verrà sottratta dal totale fattura
+ *   - airbnb_commission: commissione trattenuta da Airbnb (in euro) — info per riconciliazione
+ *   - notes
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const auth = authenticateRequest(req);
+  if (!auth) {
+    return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const allowed: Record<string, string> = {
+      city_tax_amount: 'city_tax_amount',
+      airbnb_commission: 'airbnb_commission',
+      notes: 'notes',
+    };
+
+    const sets: string[] = [];
+    const args: any[] = [];
+    for (const [key, col] of Object.entries(allowed)) {
+      if (key in body) {
+        sets.push(`${col} = ?`);
+        let v = body[key];
+        if (key === 'city_tax_amount' || key === 'airbnb_commission') {
+          v = Number(v);
+          if (!Number.isFinite(v) || v < 0) v = 0;
+        }
+        args.push(v);
+      }
+    }
+
+    if (sets.length === 0) {
+      return NextResponse.json({ error: 'Nessun campo da aggiornare' }, { status: 400 });
+    }
+
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+    args.push(params.id);
+
+    await dbExecute(
+      `UPDATE bookings SET ${sets.join(', ')} WHERE id = ?`,
+      args,
+    );
+    const updated = await dbQueryOne('SELECT * FROM bookings WHERE id = ?', [params.id]);
+    return NextResponse.json({ success: true, booking: updated });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: 'Errore server: ' + error.message },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }

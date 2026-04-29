@@ -57,6 +57,21 @@ interface Booking {
   alloggiati_sent: number;
   platform: string;
   correction_note: string | null;
+  total_amount?: number | null;
+  city_tax_amount?: number | null;
+  airbnb_commission?: number | null;
+}
+
+// Calcolo default tassa di soggiorno: 2,00 € × num_guests × clamp(notti, 1, 14)
+function calcCityTaxDefault(checkIn: string, checkOut: string, numGuests: number): number {
+  const RATE = 2.0; // €/notte/persona — modificabile in futuro da impostazioni
+  const MIN_NIGHTS = 1;
+  const MAX_NIGHTS = 14;
+  if (!checkIn || !checkOut) return RATE * Math.max(numGuests, 1) * MIN_NIGHTS;
+  const ms = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+  const nights = Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24)));
+  const billable = Math.min(MAX_NIGHTS, Math.max(MIN_NIGHTS, nights));
+  return RATE * Math.max(numGuests, 1) * billable;
 }
 
 interface AlloggiatiReceipt {
@@ -147,6 +162,16 @@ export default function BookingDetailPage() {
   const [receipts, setReceipts] = useState<AlloggiatiReceipt[]>([]);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
+
+  // Invoice state
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
+  const [invoiceMessage, setInvoiceMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // City tax / Airbnb commission editing
+  const [cityTaxInput, setCityTaxInput] = useState<string>('');
+  const [airbnbCommissionInput, setAirbnbCommissionInput] = useState<string>('');
+  const [savingTax, setSavingTax] = useState(false);
+  const [taxMessage, setTaxMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [receiptForm, setReceiptForm] = useState({
     receipt_id: '',
     send_date: '',
@@ -171,11 +196,56 @@ export default function BookingDetailPage() {
         const data = await res.json();
         setBooking(data.booking);
         setGuests(data.guests || []);
+
+        // Pre-popola city tax: se booking.city_tax_amount è valorizzato lo usiamo,
+        // altrimenti calcoliamo il default 2€ × num_guests × clamp(notti, 1, 14)
+        const ct =
+          data.booking.city_tax_amount != null && data.booking.city_tax_amount > 0
+            ? Number(data.booking.city_tax_amount)
+            : calcCityTaxDefault(data.booking.check_in, data.booking.check_out, data.booking.num_guests ?? 1);
+        setCityTaxInput(ct.toFixed(2));
+        setAirbnbCommissionInput(
+          data.booking.airbnb_commission != null
+            ? Number(data.booking.airbnb_commission).toFixed(2)
+            : ''
+        );
       }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveBookingTax() {
+    if (!booking) return;
+    setSavingTax(true);
+    setTaxMessage(null);
+    try {
+      const token = document.cookie.split('; ').find(c => c.startsWith('auth_token='))?.split('=')[1];
+      const body: any = {
+        city_tax_amount: Number(cityTaxInput || 0),
+      };
+      if (airbnbCommissionInput.trim() !== '') {
+        body.airbnb_commission = Number(airbnbCommissionInput);
+      }
+      const res = await fetch(`/api/bookings/${bookingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setBooking(data.booking);
+        setTaxMessage({ type: 'success', text: 'Salvato.' });
+        setTimeout(() => setTaxMessage(null), 2500);
+      } else {
+        setTaxMessage({ type: 'error', text: data.error ?? 'Errore' });
+      }
+    } catch (err: any) {
+      setTaxMessage({ type: 'error', text: err.message ?? 'Errore di connessione' });
+    } finally {
+      setSavingTax(false);
     }
   }
 
@@ -315,6 +385,30 @@ export default function BookingDetailPage() {
       setAlloggiatiResult({ success: false, message: 'Errore di connessione' });
     } finally {
       setSendingAlloggiati(false);
+    }
+  }
+
+  async function createInvoiceFromBooking() {
+    setCreatingInvoice(true);
+    setInvoiceMessage(null);
+    try {
+      const token = document.cookie.split('; ').find(c => c.startsWith('auth_token='))?.split('=')[1];
+      const res = await fetch(`/api/invoices/from-booking/${bookingId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Redirect al dettaglio della fattura appena creata
+        router.push(`/admin/fatturazione/${data.invoice.id}`);
+      } else {
+        setInvoiceMessage({ type: 'error', text: data.error ?? 'Errore creazione fattura' });
+      }
+    } catch (err: any) {
+      setInvoiceMessage({ type: 'error', text: err.message ?? 'Errore di connessione' });
+    } finally {
+      setCreatingInvoice(false);
     }
   }
 
@@ -478,40 +572,41 @@ export default function BookingDetailPage() {
       </div>
 
       {/* Guests Section */}
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <Users className="w-5 h-5 text-primary-500" />
-          Ospiti Registrati ({guests.length})
-        </h2>
+      <div className="mb-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Users className="w-5 h-5 text-primary-500" />
+            Ospiti Registrati ({guests.length})
+          </h2>
 
-        {guests.length > 0 && (
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowCorrectionModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors text-sm font-medium"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Richiedi correzione
-            </button>
-            {!booking.alloggiati_sent && (
+          {guests.length > 0 && (
+            <div className="flex gap-2">
               <button
-                onClick={() => setShowAlloggiatiModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+                onClick={() => setShowCorrectionModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors text-sm font-medium"
               >
-                <Send className="w-4 h-4" />
-                Invia al Portale Alloggiati
+                <RotateCcw className="w-4 h-4" />
+                Richiedi correzione
               </button>
-            )}
-          </div>
-        )}
+              {!booking.alloggiati_sent && (
+                <button
+                  onClick={() => setShowAlloggiatiModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+                >
+                  <Send className="w-4 h-4" />
+                  Invia al Portale Alloggiati
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Export Buttons */}
         {guests.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-4">
-            <span className="text-xs text-gray-500 w-full mb-1">Esporta dati:</span>
+          <div className="flex flex-wrap items-center gap-2 mt-4">
+            <span className="text-xs text-gray-500">Esporta dati:</span>
             <a
               href={`/api/bookings/${booking.id}/export?format=alloggiati`}
-              download
               className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs font-medium"
             >
               <FileDown className="w-3.5 h-3.5" />
@@ -519,7 +614,6 @@ export default function BookingDetailPage() {
             </a>
             <a
               href={`/api/bookings/${booking.id}/export?format=txt`}
-              download
               className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs font-medium"
             >
               <FileDown className="w-3.5 h-3.5" />
@@ -527,7 +621,6 @@ export default function BookingDetailPage() {
             </a>
             <a
               href={`/api/bookings/${booking.id}/export?format=ross1000`}
-              download
               className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"
             >
               <FileDown className="w-3.5 h-3.5" />
@@ -648,6 +741,172 @@ export default function BookingDetailPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Invoice / Fatturazione card */}
+      {guests.length > 0 && booking && (
+        <div className="mt-8 mb-4 admin-card">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center">
+              <Receipt className="w-5 h-5 text-primary-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Fatturazione elettronica</h3>
+              <p className="text-sm text-gray-500">
+                Imposta tassa di soggiorno e commissione, poi crea la bozza fattura
+              </p>
+            </div>
+          </div>
+
+          {/* Calcoli e campi editabili */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-wider">
+                Tassa di soggiorno (€)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={cityTaxInput}
+                onChange={(e) => setCityTaxInput(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none font-mono text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Default 2,00 €/notte/persona (1–14 notti). Modificabile se la fattura Airbnb ha un valore diverso.
+              </p>
+              <button
+                onClick={() =>
+                  setCityTaxInput(
+                    calcCityTaxDefault(
+                      booking.check_in,
+                      booking.check_out,
+                      booking.num_guests ?? 1,
+                    ).toFixed(2),
+                  )
+                }
+                className="text-xs text-primary-600 hover:underline mt-1"
+                type="button"
+              >
+                Ricalcola default
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-wider">
+                Commissione Airbnb (€)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="es. 52.70"
+                value={airbnbCommissionInput}
+                onChange={(e) => setAirbnbCommissionInput(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none font-mono text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Solo informativa — non sottratta dal totale fattura. Serve per riconciliare con la fattura passiva Airbnb.
+              </p>
+            </div>
+
+            <div className="bg-primary-50 rounded-lg p-3 text-sm">
+              <div className="text-xs text-gray-500 uppercase tracking-wider mb-1.5">
+                Anteprima totale fattura
+              </div>
+              {(() => {
+                const totale = Number(booking.total_amount ?? 0);
+                const cityTax = Number(cityTaxInput || 0);
+                const fattura = Math.max(0, totale - cityTax);
+                const imponibile = fattura / 1.1;
+                const iva = fattura - imponibile;
+                return (
+                  <>
+                    <div className="flex justify-between text-gray-700">
+                      <span>Totale ospite</span>
+                      <span className="font-mono">{totale.toFixed(2)} €</span>
+                    </div>
+                    <div className="flex justify-between text-gray-700">
+                      <span>− tasse soggiorno</span>
+                      <span className="font-mono">{cityTax.toFixed(2)} €</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-primary-900 mt-1.5 pt-1.5 border-t border-primary-200">
+                      <span>= Totale fattura</span>
+                      <span className="font-mono">{fattura.toFixed(2)} €</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>(imponibile + IVA 10%)</span>
+                      <span className="font-mono">
+                        {imponibile.toFixed(2)} + {iva.toFixed(2)}
+                      </span>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+
+          {taxMessage && (
+            <div
+              className={`p-3 rounded-lg text-sm flex items-center gap-2 mb-3 ${
+                taxMessage.type === 'success'
+                  ? 'bg-green-50 text-green-700'
+                  : 'bg-red-50 text-red-700'
+              }`}
+            >
+              {taxMessage.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : (
+                <AlertCircle className="w-4 h-4" />
+              )}
+              {taxMessage.text}
+            </div>
+          )}
+
+          <div className="flex gap-2 justify-between items-center">
+            <button
+              onClick={saveBookingTax}
+              disabled={savingTax}
+              className="px-4 py-2 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+            >
+              {savingTax ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              Salva valori
+            </button>
+            <button
+              onClick={createInvoiceFromBooking}
+              disabled={creatingInvoice}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors text-sm font-medium disabled:opacity-50"
+            >
+              {creatingInvoice ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Receipt className="w-4 h-4" />
+              )}
+              Crea bozza fattura
+            </button>
+          </div>
+        </div>
+      )}
+
+      {invoiceMessage && (
+        <div
+          className={`mb-4 p-4 rounded-xl flex items-start gap-3 ${
+            invoiceMessage.type === 'success'
+              ? 'bg-green-50 text-green-700'
+              : 'bg-red-50 text-red-700'
+          }`}
+        >
+          {invoiceMessage.type === 'success' ? (
+            <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          ) : (
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          )}
+          {invoiceMessage.text}
         </div>
       )}
 

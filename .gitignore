@@ -39,3 +39,17 @@ next-env.d.ts
 
 # uploads (documents)
 /uploads/
+
+# build artefatti dev
+.build.log
+.build.done
+
+# Claude Code workspace locale (non committare)
+.claude/
+
+# Vercel env snapshots accidentali
+.env.vercel
+.env.vercel-check
+
+# Smoke test placeholder
+src/lib/fatturapa/_smoke_test.ts

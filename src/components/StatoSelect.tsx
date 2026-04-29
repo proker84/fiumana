@@ -18,24 +18,88 @@ interface StatoSelectProps {
   showItalia?: boolean;
 }
 
-// Common countries for quick selection
+// Common countries for quick selection - includes all EU/EEA countries and other frequent nationalities
 const COMMON_COUNTRIES = [
+  // Italia
   { codice: '100000100', nome: 'ITALIA' },
+  // Unione Europea
   { codice: '100000203', nome: 'AUSTRIA' },
   { codice: '100000206', nome: 'BELGIO' },
-  { codice: '100000209', nome: 'FRANCIA' },
-  { codice: '100000210', nome: 'GERMANIA' },
-  { codice: '100000213', nome: 'PAESI BASSI' },
-  { codice: '100000214', nome: 'PORTOGALLO' },
-  { codice: '100000215', nome: 'REGNO UNITO' },
-  { codice: '100000219', nome: 'SPAGNA' },
-  { codice: '100000220', nome: 'SVIZZERA' },
+  { codice: '100000209', nome: 'BULGARIA' },
+  { codice: '100000315', nome: 'CIPRO' },
+  { codice: '100000250', nome: 'CROAZIA' },
+  { codice: '100000212', nome: 'DANIMARCA' },
+  { codice: '100000247', nome: 'ESTONIA' },
+  { codice: '100000214', nome: 'FINLANDIA' },
+  { codice: '100000215', nome: 'FRANCIA' },
+  { codice: '100000216', nome: 'GERMANIA' },
+  { codice: '100000220', nome: 'GRECIA' },
+  { codice: '100000221', nome: 'IRLANDA' },
+  { codice: '100000248', nome: 'LETTONIA' },
+  { codice: '100000249', nome: 'LITUANIA' },
+  { codice: '100000226', nome: 'LUSSEMBURGO' },
+  { codice: '100000227', nome: 'MALTA' },
+  { codice: '100000232', nome: 'PAESI BASSI' },
   { codice: '100000233', nome: 'POLONIA' },
+  { codice: '100000234', nome: 'PORTOGALLO' },
+  { codice: '100000257', nome: 'REPUBBLICA CECA' },
   { codice: '100000235', nome: 'ROMANIA' },
-  { codice: '100000336', nome: 'STATI UNITI D\'AMERICA' },
+  { codice: '100000255', nome: 'REPUBBLICA SLOVACCA' },
+  { codice: '100000251', nome: 'SLOVENIA' },
+  { codice: '100000239', nome: 'SPAGNA' },
+  { codice: '100000240', nome: 'SVEZIA' },
+  { codice: '100000244', nome: 'UNGHERIA' },
+  // Spazio Economico Europeo (SEE) e Svizzera
+  { codice: '100000223', nome: 'ISLANDA' },
+  { codice: '100000225', nome: 'LIECHTENSTEIN' },
+  { codice: '100000231', nome: 'NORVEGIA' },
+  { codice: '100000241', nome: 'SVIZZERA' },
+  // Regno Unito
+  { codice: '100000219', nome: 'REGNO UNITO' },
+  // Balcani e paesi limitrofi
+  { codice: '100000201', nome: 'ALBANIA' },
+  { codice: '100000252', nome: 'BOSNIA ED ERZEGOVINA' },
+  { codice: '100000997', nome: 'MACEDONIA DEL NORD' },
+  { codice: '100001001', nome: 'MONTENEGRO' },
+  { codice: '100001000', nome: 'SERBIA' },
+  { codice: '100001002', nome: 'KOSOVO' },
+  // Europa orientale
+  { codice: '100000243', nome: 'UCRAINA' },
+  { codice: '100000254', nome: 'MOLDAVIA' },
+  { codice: '100000256', nome: 'BIELORUSSIA' },
+  { codice: '100000245', nome: 'FEDERAZIONE RUSSA' },
+  { codice: '100000360', nome: 'GEORGIA' },
+  { codice: '100000358', nome: 'ARMENIA' },
+  { codice: '100000359', nome: 'AZERBAIGIAN' },
+  // Turchia
+  { codice: '100000351', nome: 'TURCHIA' },
+  // Nord Africa e Medio Oriente
+  { codice: '100000436', nome: 'MAROCCO' },
+  { codice: '100000460', nome: 'TUNISIA' },
+  { codice: '100000419', nome: 'EGITTO' },
+  { codice: '100000334', nome: 'ISRAELE' },
+  // Asia
+  { codice: '100000314', nome: 'CINA' },
+  { codice: '100000326', nome: 'GIAPPONE' },
+  { codice: '100000320', nome: 'COREA DEL SUD' },
+  { codice: '100000330', nome: 'INDIA' },
+  { codice: '100000323', nome: 'FILIPPINE' },
+  // Americhe
+  { codice: '100000536', nome: 'STATI UNITI D\'AMERICA' },
+  { codice: '100000509', nome: 'CANADA' },
+  { codice: '100000527', nome: 'MESSICO' },
   { codice: '100000602', nome: 'ARGENTINA' },
   { codice: '100000605', nome: 'BRASILE' },
+  { codice: '100000608', nome: 'COLOMBIA' },
+  { codice: '100000615', nome: 'PERU\'' },
+  { codice: '100000619', nome: 'VENEZUELA' },
+  // Oceania
   { codice: '100000701', nome: 'AUSTRALIA' },
+  { codice: '100000719', nome: 'NUOVA ZELANDA' },
+  // Africa subsahariana
+  { codice: '100000443', nome: 'NIGERIA' },
+  { codice: '100000450', nome: 'SENEGAL' },
+  { codice: '100000454', nome: 'SUDAFRICA' },
 ];
 
 export default function StatoSelect({

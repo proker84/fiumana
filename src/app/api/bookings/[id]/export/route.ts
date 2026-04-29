@@ -69,7 +69,7 @@ export async function GET(
     }
 
     const guestsRows = await dbQuery(
-      'SELECT * FROM guests WHERE booking_id = ? ORDER BY progressivo ASC',
+      'SELECT * FROM guests WHERE booking_id = ? ORDER BY id ASC',
       [params.id]
     );
     const guests = guestsRows as unknown as Guest[];

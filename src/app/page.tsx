@@ -76,7 +76,7 @@ export default function HomePage() {
     {
       icon: Key,
       title: 'Check-in & Check-out',
-      desc: 'Accoglienza professionale degli ospiti con self check-in smart o accoglienza personale.',
+      desc: 'Accoglienza professionale degli ospiti con check-in personalizzato.',
       color: 'from-emerald-500 to-green-600',
     },
     {

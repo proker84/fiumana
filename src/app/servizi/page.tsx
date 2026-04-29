@@ -45,8 +45,8 @@ export default function ServiziPage() {
     {
       icon: Key,
       title: 'Check-in e Check-out Professionali',
-      desc: 'Accoglienza personalizzata o self check-in con smart lock. Guide dell\'alloggio in più lingue, supporto 24/7 durante il soggiorno.',
-      features: ['Self check-in smart', 'Accoglienza personale', 'Guide multilingua', 'Supporto H24'],
+      desc: 'Check-in personalizzato. Guide dell\'alloggio in più lingue, supporto 24/7 durante il soggiorno.',
+      features: ['Check-in personalizzato', 'Guide multilingua', 'Supporto H24'],
     },
     {
       icon: Sparkles,

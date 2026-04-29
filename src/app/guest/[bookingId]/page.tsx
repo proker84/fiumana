@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Language, languages, getTranslation } from '@/lib/translations';
 import ComuneSelect from '@/components/ComuneSelect';
+import StatoSelect from '@/components/StatoSelect';
 
 interface GuestForm {
   id: number;
@@ -61,26 +62,6 @@ interface BookingInfo {
   status: string;
   correction_note: string | null;
 }
-
-const COMMON_COUNTRIES = [
-  { code: '100000100', name: 'Italia' },
-  { code: '100000203', name: 'Germania / Germany / Deutschland' },
-  { code: '100000209', name: 'Francia / France / Frankreich' },
-  { code: '100000219', name: 'Spagna / Spain / Spanien / España' },
-  { code: '100000215', name: 'Regno Unito / United Kingdom' },
-  { code: '100000336', name: 'Stati Uniti / USA' },
-  { code: '100000220', name: 'Svizzera / Switzerland / Schweiz' },
-  { code: '100000201', name: 'Austria / Österreich' },
-  { code: '100000213', name: 'Olanda / Netherlands' },
-  { code: '100000202', name: 'Belgio / Belgium / Belgique' },
-  { code: '100000214', name: 'Portogallo / Portugal' },
-  { code: '100000235', name: 'Romania' },
-  { code: '100000233', name: 'Polonia / Poland / Polen' },
-  { code: '100000602', name: 'Brasile / Brazil / Brasil' },
-  { code: '100000404', name: 'Cina / China' },
-  { code: '100000413', name: 'Giappone / Japan' },
-  { code: '100000501', name: 'Australia' },
-];
 
 const emptyGuest = (): GuestForm => ({
   id: Date.now(),
@@ -614,32 +595,22 @@ export default function GuestPage() {
                   {/* Birth Info */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                        {t('countryOfBirth')} *
-                      </label>
-                      <select
+                      <StatoSelect
                         value={guest.stato_nascita}
-                        onChange={(e) => updateGuest(guest.id, 'stato_nascita', e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm bg-white"
-                      >
-                        {COMMON_COUNTRIES.map((c) => (
-                          <option key={c.code} value={c.code}>{c.name}</option>
-                        ))}
-                      </select>
+                        onChange={(codice) => updateGuest(guest.id, 'stato_nascita', codice)}
+                        label={t('countryOfBirth')}
+                        placeholder={t('searchCountry') || 'Cerca stato...'}
+                        required
+                      />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                        {t('citizenship')} *
-                      </label>
-                      <select
+                      <StatoSelect
                         value={guest.cittadinanza}
-                        onChange={(e) => updateGuest(guest.id, 'cittadinanza', e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm bg-white"
-                      >
-                        {COMMON_COUNTRIES.map((c) => (
-                          <option key={c.code} value={c.code}>{c.name}</option>
-                        ))}
-                      </select>
+                        onChange={(codice) => updateGuest(guest.id, 'cittadinanza', codice)}
+                        label={t('citizenship')}
+                        placeholder={t('searchCountry') || 'Cerca stato...'}
+                        required
+                      />
                     </div>
                   </div>
 
@@ -669,18 +640,13 @@ export default function GuestPage() {
                     </h4>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                          {t('countryOfResidence') || 'Stato Residenza'} *
-                        </label>
-                        <select
+                        <StatoSelect
                           value={guest.stato_residenza}
-                          onChange={(e) => updateGuest(guest.id, 'stato_residenza', e.target.value)}
-                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm bg-white"
-                        >
-                          {COMMON_COUNTRIES.map((c) => (
-                            <option key={c.code} value={c.code}>{c.name}</option>
-                          ))}
-                        </select>
+                          onChange={(codice) => updateGuest(guest.id, 'stato_residenza', codice)}
+                          label={t('countryOfResidence') || 'Stato Residenza'}
+                          placeholder={t('searchCountry') || 'Cerca stato...'}
+                          required
+                        />
                       </div>
                       {guest.stato_residenza === '100000100' && (
                         <div>
@@ -749,18 +715,13 @@ export default function GuestPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-4 mt-4">
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                          {t('countryOfIssue') || 'Stato Rilascio'} *
-                        </label>
-                        <select
+                        <StatoSelect
                           value={guest.stato_rilascio}
-                          onChange={(e) => updateGuest(guest.id, 'stato_rilascio', e.target.value)}
-                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm bg-white"
-                        >
-                          {COMMON_COUNTRIES.map((c) => (
-                            <option key={c.code} value={c.code}>{c.name}</option>
-                          ))}
-                        </select>
+                          onChange={(codice) => updateGuest(guest.id, 'stato_rilascio', codice)}
+                          label={t('countryOfIssue') || 'Stato Rilascio'}
+                          placeholder={t('searchCountry') || 'Cerca stato...'}
+                          required
+                        />
                       </div>
                       {guest.stato_rilascio === '100000100' ? (
                         <div>
