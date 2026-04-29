@@ -98,7 +98,7 @@ se preferisci tenere Preview/Dev sul Mac).
 | `TURSO_AUTH_TOKEN` | token Turso |
 | `BLOB_READ_WRITE_TOKEN` | token Vercel Blob (se usi @vercel/blob) |
 | `RESEND_API_KEY` | API key Resend (se invii email) |
-| `NEXT_PUBLIC_BASE_URL` | `https://immobiliare-fiumana.vercel.app` (o domain custom) |
+| `NEXT_PUBLIC_BASE_URL` | `https://immobiliarefiumana.com` (o domain custom) |
 | `ALLOGGIATI_USERNAME` / `ALLOGGIATI_WSKEY` | credenziali Portale Alloggiati (se usate) |
 
 ### NUOVE — modulo fatturazione
@@ -124,7 +124,7 @@ le `CREATE TABLE IF NOT EXISTS` su Turso. Quindi le 5 tabelle nuove + ALTER su
 
 Verifica veloce dopo il deploy:
 
-1. Vai su `https://immobiliare-fiumana.vercel.app/admin`
+1. Vai su `https://immobiliarefiumana.com/admin`
 2. Login con le credenziali admin
 3. Click su **Fatturazione** nella sidebar — la pagina deve caricare senza errore
 4. Click su **Impostazioni** → la riga `id=1` viene creata con i default Fiumana già pre-compilati
@@ -142,7 +142,7 @@ Adesso che hai un URL pubblico stabile, configura i webhook ACube definitivament
 
 ### 6a) Genera webhook secret
 
-1. Vai su `https://immobiliare-fiumana.vercel.app/admin/fatturazione/impostazioni`
+1. Vai su `https://immobiliarefiumana.com/admin/fatturazione/impostazioni`
 2. Sezione **"Webhook secret"** → bottone **"Genera webhook secret"**
 3. Il secret viene copiato negli appunti **una volta sola**. Conservalo.
 
@@ -162,7 +162,7 @@ Per ogni voce:
 
 | Campo | Valore |
 |---|---|
-| **URL** | `https://immobiliare-fiumana.vercel.app/api/invoices/webhook/acube` |
+| **URL** | `https://immobiliarefiumana.com/api/invoices/webhook/acube` |
 | **Authentication type** | `header` |
 | **Authentication key** | `Authorization` |
 | **Authentication token** | `Bearer <webhook-secret-generato>` |
@@ -182,13 +182,14 @@ Se i webhook non arrivano:
 
 ---
 
-## 7) Domain custom (opzionale)
+## 7) Dominio custom
 
-Se vuoi un dominio tipo `immobiliarefiumana.it` invece di `*.vercel.app`:
+Il dominio del progetto è **immobiliarefiumana.com**. Se non è ancora connesso al progetto Vercel:
 
-1. Vercel → Settings → Domains → Add `immobiliarefiumana.it`
-2. Aggiorna i 5 webhook ACube con il nuovo URL
-3. Aggiorna `NEXT_PUBLIC_BASE_URL` con il nuovo dominio
+1. Vercel → Settings → Domains → Add `immobiliarefiumana.com` e `www.immobiliarefiumana.com`
+2. Configura i record DNS come indicato da Vercel (A record + CNAME)
+3. Verifica `NEXT_PUBLIC_BASE_URL=https://immobiliarefiumana.com` nelle env vars
+4. Se cambi dominio in futuro, ricordati di aggiornare i 5 webhook ACube
 
 ---
 
