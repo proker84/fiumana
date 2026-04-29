@@ -1,6 +1,12 @@
 import { createClient, Client } from '@libsql/client';
 
 let client: Client | null = null;
+// Promise di inizializzazione: viene awaited dai wrapper dbExecute/dbQuery
+// per evitare race condition fra "primo getDb()" e prime query in arrivo.
+// Tutte le statement dentro initializeDb sono idempotenti (CREATE TABLE IF NOT
+// EXISTS / ALTER con check PRAGMA / INSERT solo se vuoto), quindi awaitarla
+// più volte è gratuito e non distruttivo per i dati esistenti.
+let initPromise: Promise<void> | null = null;
 
 export function getDb(): Client {
   if (!client) {
@@ -17,10 +23,20 @@ export function getDb(): Client {
       });
     }
 
-    // Initialize tables (async, but we handle it)
-    initializeDb(client);
+    // Avvia l'init e MEMORIZZA la promise. I wrapper la await prima di ogni query.
+    initPromise = initializeDb(client);
   }
   return client;
+}
+
+/**
+ * Attende che le CREATE TABLE / ALTER COLUMN della prima inizializzazione
+ * siano completate. Non distrugge mai dati: tutte le statement sono idempotenti.
+ * Sicuro chiamarla N volte (no-op dopo la prima).
+ */
+export async function ensureDbReady(): Promise<void> {
+  if (!client) getDb(); // assicura che client + initPromise esistano
+  if (initPromise) await initPromise;
 }
 
 async function initializeDb(db: Client) {
@@ -381,14 +397,18 @@ async function initializeDb(db: Client) {
   }
 }
 
-// Helper functions to make migration easier
+// Helper functions to make migration easier.
+// Awaitano `ensureDbReady` così la prima query attende che le CREATE TABLE
+// IF NOT EXISTS finiscano, evitando "no such table" su cold-start serverless.
 export async function dbExecute(sql: string, args: any[] = []) {
   const db = getDb();
+  await ensureDbReady();
   return await db.execute({ sql, args });
 }
 
 export async function dbQuery(sql: string, args: any[] = []) {
   const db = getDb();
+  await ensureDbReady();
   const result = await db.execute({ sql, args });
   return result.rows;
 }
