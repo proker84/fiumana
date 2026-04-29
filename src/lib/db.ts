@@ -181,6 +181,145 @@ async function initializeDb(db: Client) {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (booking_id) REFERENCES bookings(id)
       );
+
+      -- ============================================================
+      -- MODULO FATTURAZIONE ELETTRONICA (ACube + SDI)
+      -- ============================================================
+
+      -- Configurazione emittente (singleton, id=1)
+      CREATE TABLE IF NOT EXISTS invoice_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        ragione_sociale TEXT NOT NULL,
+        partita_iva TEXT NOT NULL,
+        codice_fiscale TEXT NOT NULL,
+        regime_fiscale TEXT NOT NULL DEFAULT 'RF01',
+        indirizzo TEXT NOT NULL,
+        cap TEXT NOT NULL,
+        comune TEXT NOT NULL,
+        provincia TEXT NOT NULL,
+        nazione TEXT NOT NULL DEFAULT 'IT',
+        iban TEXT,
+        rea TEXT,
+        capitale_sociale_cents INTEGER,
+        pec_emittente TEXT,
+        -- credenziali sender (cifrate AES-256-GCM)
+        sender_provider TEXT,
+        sender_api_key_encrypted TEXT,
+        sender_endpoint TEXT,
+        sender_test_mode INTEGER DEFAULT 1,
+        webhook_secret TEXT,
+        -- ACube specific
+        acube_business_registry_uuid TEXT,
+        acube_numbering_sequence_uuid TEXT,
+        acube_numbering_sequence_name TEXT DEFAULT 'FiumanaAIR',
+        acube_credit_note_sequence_uuid TEXT,
+        acube_credit_note_sequence_name TEXT DEFAULT 'FiumanaAIRNC',
+        -- conservazione
+        conservazione_provider TEXT DEFAULT 'acube',
+        -- default city tax (cents per night per person, override per booking)
+        tassa_soggiorno_default_cents INTEGER DEFAULT 200,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Anagrafica clienti (separata da guests perché serve indirizzo fiscale)
+      CREATE TABLE IF NOT EXISTS customers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tipo TEXT NOT NULL DEFAULT 'PF',
+        ragione_sociale TEXT,
+        cognome TEXT,
+        nome TEXT,
+        codice_fiscale TEXT,
+        partita_iva TEXT,
+        nazione TEXT NOT NULL DEFAULT 'IT',
+        indirizzo TEXT,
+        cap TEXT,
+        comune TEXT,
+        provincia TEXT,
+        email TEXT,
+        pec TEXT,
+        codice_destinatario TEXT DEFAULT '0000000',
+        is_estero INTEGER DEFAULT 0,
+        source_guest_id INTEGER,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (source_guest_id) REFERENCES guests(id)
+      );
+
+      -- Fatture
+      CREATE TABLE IF NOT EXISTS invoices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tipo_documento TEXT NOT NULL DEFAULT 'TD01',
+        sezionale TEXT NOT NULL,
+        numero INTEGER,
+        anno INTEGER,
+        numero_completo TEXT,
+        data_documento DATE NOT NULL,
+        booking_id INTEGER,
+        customer_id INTEGER NOT NULL,
+        parent_invoice_id INTEGER,
+        idempotency_key TEXT UNIQUE,
+        imponibile_cents INTEGER NOT NULL,
+        iva_cents INTEGER NOT NULL,
+        totale_cents INTEGER NOT NULL,
+        aliquota_iva REAL NOT NULL DEFAULT 10.0,
+        natura_iva TEXT,
+        booking_total_cents INTEGER,
+        city_tax_cents INTEGER,
+        airbnb_commission_cents INTEGER,
+        modalita_pagamento TEXT DEFAULT 'MP08',
+        data_pagamento DATE,
+        stato TEXT NOT NULL DEFAULT 'bozza',
+        marking_acube TEXT,
+        external_id TEXT,
+        sdi_identificativo TEXT,
+        xml_url TEXT,
+        xml_filename TEXT,
+        pdf_url TEXT,
+        ricevuta_consegna_url TEXT,
+        inviata_at DATETIME,
+        consegnata_at DATETIME,
+        last_polled_at DATETIME,
+        poll_attempts INTEGER DEFAULT 0,
+        notes TEXT,
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (booking_id) REFERENCES bookings(id),
+        FOREIGN KEY (customer_id) REFERENCES customers(id),
+        FOREIGN KEY (parent_invoice_id) REFERENCES invoices(id)
+      );
+
+      -- Righe fattura
+      CREATE TABLE IF NOT EXISTS invoice_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invoice_id INTEGER NOT NULL,
+        riga_numero INTEGER NOT NULL,
+        descrizione TEXT NOT NULL,
+        quantita REAL DEFAULT 1,
+        prezzo_unitario_cents INTEGER NOT NULL,
+        aliquota_iva REAL NOT NULL DEFAULT 10.0,
+        natura_iva TEXT,
+        imponibile_cents INTEGER NOT NULL,
+        iva_cents INTEGER NOT NULL,
+        totale_cents INTEGER NOT NULL,
+        FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+      );
+
+      -- Storico notifiche SDI / log eventi ACube (audit trail)
+      CREATE TABLE IF NOT EXISTS invoice_sdi_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invoice_id INTEGER NOT NULL,
+        event_type TEXT NOT NULL,
+        event_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        http_status INTEGER,
+        payload_in TEXT,
+        payload_out TEXT,
+        error_code TEXT,
+        error_message TEXT,
+        raw_xml_url TEXT,
+        FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+      );
     `);
 
     // Create indexes
@@ -192,6 +331,40 @@ async function initializeDb(db: Client) {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_cleaning_issues_cleaning ON cleaning_issues(cleaning_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_cleaning_config_token ON cleaning_config(access_token)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_alloggiati_receipts_booking ON alloggiati_receipts(booking_id)');
+
+    // Indexes — modulo fatturazione
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_customers_cf ON customers(codice_fiscale)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_customers_piva ON customers(partita_iva)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_customers_nazione ON customers(nazione)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_invoices_booking ON invoices(booking_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_invoices_customer ON invoices(customer_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_invoices_stato ON invoices(stato)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_invoices_data ON invoices(data_documento)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_invoices_external ON invoices(external_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_invoices_idemp ON invoices(idempotency_key)');
+    await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_numero_unique ON invoices(sezionale, numero, anno, tipo_documento) WHERE numero IS NOT NULL');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_invoice_items_inv ON invoice_items(invoice_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_sdi_logs_invoice ON invoice_sdi_logs(invoice_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_sdi_logs_event ON invoice_sdi_logs(event_type)');
+
+    // Migration additiva su `bookings`: aggiunge city_tax_amount, airbnb_commission e cancelled se mancanti.
+    // SQLite/Turso non supporta "ALTER TABLE ADD COLUMN IF NOT EXISTS", quindi ispezioniamo PRAGMA table_info.
+    try {
+      const cols = await db.execute('PRAGMA table_info(bookings)');
+      const colNames = new Set(cols.rows.map((r: any) => String(r.name)));
+      if (!colNames.has('city_tax_amount')) {
+        await db.execute('ALTER TABLE bookings ADD COLUMN city_tax_amount REAL DEFAULT 0');
+      }
+      if (!colNames.has('airbnb_commission')) {
+        await db.execute('ALTER TABLE bookings ADD COLUMN airbnb_commission REAL DEFAULT 0');
+      }
+      // Campo per soft-delete delle prenotazioni non più presenti nel CSV Airbnb
+      if (!colNames.has('cancelled')) {
+        await db.execute('ALTER TABLE bookings ADD COLUMN cancelled INTEGER DEFAULT 0');
+      }
+    } catch (e) {
+      console.error('Migration bookings columns failed:', e);
+    }
 
     // Create default admin if not exists
     const adminExists = await db.execute('SELECT COUNT(*) as count FROM admin_users');

@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
       LEFT JOIN cleaning_schedules cs ON b.id = cs.booking_id
       WHERE b.check_out >= '${currentYear}-01-01'
         AND b.check_out <= '${currentYear}-12-31'
+        AND (b.cancelled = 0 OR b.cancelled IS NULL)
       ORDER BY b.check_out ASC
     `);
 

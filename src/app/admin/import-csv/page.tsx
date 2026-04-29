@@ -15,6 +15,7 @@ import {
 interface ImportResult {
   success: boolean;
   imported: number;
+  cancelled?: number;
   errors: string[];
   bookings?: any[];
 }
@@ -198,9 +199,29 @@ export default function ImportCSVPage() {
                   <h3 className="font-bold text-gray-900">Importazione Completata</h3>
                   <p className="text-sm text-gray-500">
                     {result.imported} prenotazioni importate con successo
+                    {result.cancelled && result.cancelled > 0 && (
+                      <span className="text-red-500 ml-2">
+                        ({result.cancelled} cancellate perche non piu presenti)
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
+
+              {result.cancelled && result.cancelled > 0 && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-semibold text-red-800">Prenotazioni Cancellate</h4>
+                      <p className="text-red-700 text-sm mt-1">
+                        {result.cancelled} prenotazioni sono state marcate come cancellate perche non presenti nel file CSV.
+                        Queste prenotazioni sono ancora visibili nel filtro Cancellate ma non appariranno nelle pulizie.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {result.bookings && result.bookings.length > 0 && (
                 <div className="mt-4 bg-gray-50 rounded-xl p-4">

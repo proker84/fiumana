@@ -36,6 +36,7 @@ interface Booking {
   platform: string;
   created_at: string;
   guests_count?: number;
+  cancelled?: number;
 }
 
 export default function PrenotazioniPage() {
@@ -191,10 +192,17 @@ Fabio & David`;
       b.guest_name?.toLowerCase().includes(search.toLowerCase()) ||
       b.booking_id.toLowerCase().includes(search.toLowerCase());
 
-    const matchFilter =
-      filter === 'all' ||
-      (filter === 'pending' && !b.alloggiati_sent) ||
-      (filter === 'sent' && b.alloggiati_sent);
+    let matchFilter = false;
+    if (filter === 'all') {
+      // "Tutti" esclude le cancellate di default
+      matchFilter = !b.cancelled;
+    } else if (filter === 'cancelled') {
+      matchFilter = !!b.cancelled;
+    } else if (filter === 'pending') {
+      matchFilter = !b.alloggiati_sent && !b.cancelled;
+    } else if (filter === 'sent') {
+      matchFilter = !!b.alloggiati_sent && !b.cancelled;
+    }
 
     return matchSearch && matchFilter;
   });
@@ -209,8 +217,9 @@ Fabio & David`;
     return dateA.getTime() - dateB.getTime();
   });
 
-  // Trova la prossima prenotazione (check-in >= oggi)
+  // Trova la prossima prenotazione (check-in >= oggi, non cancellata)
   const nextBooking = sortedBookings.find(b => {
+    if (b.cancelled) return false; // Escludi prenotazioni cancellate
     const checkIn = new Date(b.check_in);
     checkIn.setHours(0, 0, 0, 0);
     return checkIn >= today;
@@ -260,11 +269,12 @@ Fabio & David`;
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {[
               { key: 'all', label: 'Tutti' },
               { key: 'pending', label: 'Da Inviare' },
               { key: 'sent', label: 'Inviati' },
+              { key: 'cancelled', label: 'Cancellate' },
             ].map((f) => (
               <button
                 key={f.key}
@@ -391,7 +401,9 @@ Fabio & David`;
               <tbody className="divide-y divide-gray-50">
                 {otherBookings.map((b) => (
                   <tr key={b.id} className={`text-sm transition-colors ${
-                    b.status === 'guests_registered'
+                    b.cancelled
+                      ? 'bg-red-50 hover:bg-red-100'
+                      : b.status === 'guests_registered'
                       ? 'bg-green-50 hover:bg-green-100'
                       : 'hover:bg-gray-50'
                   }`}>
@@ -414,7 +426,11 @@ Fabio & David`;
                       </div>
                     </td>
                     <td className="py-4 pr-4">
-                      {b.alloggiati_sent ? (
+                      {b.cancelled ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-100 px-2.5 py-1 rounded-full">
+                          <X className="w-3 h-3" /> Cancellata
+                        </span>
+                      ) : b.alloggiati_sent ? (
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
                           <CheckCircle2 className="w-3 h-3" /> Inviato
                         </span>
@@ -425,44 +441,48 @@ Fabio & David`;
                       )}
                     </td>
                     <td className="py-4">
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => copyLink(b)}
-                          className="p-2 rounded-lg hover:bg-primary-50 text-gray-400 hover:text-primary-600 transition-colors"
-                          title="Copia messaggio registrazione"
-                        >
-                          {copiedId === b.guest_token ? (
-                            <CheckCircle2 className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => copyInstructions(b)}
-                          className="p-2 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-600 transition-colors"
-                          title="Copia istruzioni check-in"
-                        >
-                          {copiedId === 'instructions-' + b.guest_token ? (
-                            <CheckCircle2 className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <MapPin className="w-4 h-4" />
-                          )}
-                        </button>
-                        <Link
-                          href={`/admin/prenotazioni/${b.id}`}
-                          className="p-2 rounded-lg hover:bg-primary-50 text-gray-400 hover:text-primary-600 transition-colors"
-                          title="Vedi dettagli"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Link>
-                        <button
-                          onClick={() => setDeleteModal(b)}
-                          className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
-                          title="Elimina"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {b.cancelled ? (
+                        <span className="text-xs text-red-400 italic">Nessuna azione</span>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => copyLink(b)}
+                            className="p-2 rounded-lg hover:bg-primary-50 text-gray-400 hover:text-primary-600 transition-colors"
+                            title="Copia messaggio registrazione"
+                          >
+                            {copiedId === b.guest_token ? (
+                              <CheckCircle2 className="w-4 h-4 text-green-500" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => copyInstructions(b)}
+                            className="p-2 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-600 transition-colors"
+                            title="Copia istruzioni check-in"
+                          >
+                            {copiedId === 'instructions-' + b.guest_token ? (
+                              <CheckCircle2 className="w-4 h-4 text-green-500" />
+                            ) : (
+                              <MapPin className="w-4 h-4" />
+                            )}
+                          </button>
+                          <Link
+                            href={`/admin/prenotazioni/${b.id}`}
+                            className="p-2 rounded-lg hover:bg-primary-50 text-gray-400 hover:text-primary-600 transition-colors"
+                            title="Vedi dettagli"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Link>
+                          <button
+                            onClick={() => setDeleteModal(b)}
+                            className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+                            title="Elimina"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

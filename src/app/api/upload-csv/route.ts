@@ -92,6 +92,7 @@ export async function POST(req: NextRequest) {
 
     const errors: string[] = [];
     const imported: any[] = [];
+    const csvBookingIds: string[] = []; // Raccoglie tutti i booking_id validi dal CSV
 
     for (let i = 0; i < records.length; i++) {
       const record = records[i];
@@ -118,6 +119,9 @@ export async function POST(req: NextRequest) {
         errors.push(`Riga ${rowNum}: Codice conferma mancante, riga saltata`);
         continue;
       }
+
+      // Aggiungi alla lista di booking_id validi (anche se già esistente)
+      csvBookingIds.push(bookingId);
 
       if (!checkIn || !checkOut) {
         errors.push(`Riga ${rowNum}: Date check-in/check-out mancanti per ${bookingId}`);
@@ -151,16 +155,33 @@ export async function POST(req: NextRequest) {
             guest_token: guestToken,
           });
         } else {
-          errors.push(`Riga ${rowNum}: Prenotazione ${bookingId} già presente, saltata`);
+          // Prenotazione già esistente: riattivala se era cancellata
+          await dbExecute(
+            `UPDATE bookings SET cancelled = 0 WHERE booking_id = ? AND cancelled = 1`,
+            [bookingId]
+          );
         }
       } catch (err: any) {
         errors.push(`Riga ${rowNum}: Errore - ${err.message}`);
       }
     }
 
+    // Marca come cancellate le prenotazioni non presenti nel CSV
+    let cancelledCount = 0;
+    if (csvBookingIds.length > 0) {
+      // Costruisce i placeholder per la query IN
+      const placeholders = csvBookingIds.map(() => '?').join(',');
+      const cancelResult = await dbExecute(
+        `UPDATE bookings SET cancelled = 1 WHERE booking_id NOT IN (${placeholders}) AND cancelled = 0`,
+        csvBookingIds
+      );
+      cancelledCount = Number(cancelResult.rowsAffected || 0);
+    }
+
     return NextResponse.json({
       success: true,
       imported: imported.length,
+      cancelled: cancelledCount,
       errors,
       bookings: imported,
     });
