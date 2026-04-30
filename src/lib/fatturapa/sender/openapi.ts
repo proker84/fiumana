@@ -186,11 +186,13 @@ export class OpenapiSender implements InvoiceSender {
   // ─── send (POST /invoices o /invoices_legal_storage) ────────────────────
 
   async send(payload: unknown, ctx: SendContext): Promise<SendResult> {
-    // Quando la BusinessRegistry ha apply_legal_storage=true E il prodotto Legalinvoice
-    // è attivo sul token, Openapi richiede l'endpoint /invoices_legal_storage per attivare
-    // la conservazione 10 anni. Usiamo /invoices base di default — opt-in esplicito tramite
-    // conservazioneProvider==='openapi-legal-storage' quando attiverai Legalinvoice.
+    // La BusinessRegistry per Fiumana è stata creata con apply_legal_storage=true
+    // (vedi scripts/openapi-setup.ts) → Openapi rifiuta /invoices con HTTP 412 e
+    // pretende /invoices_legal_storage. Quando conservazioneProvider è 'openapi'
+    // (default Fiumana) usiamo l'endpoint con conservazione. Per disattivare in
+    // modo esplicito, settare conservazioneProvider='none' (o null) lato DB.
     const useLegalStorage =
+      this.settings.conservazioneProvider === 'openapi' ||
       this.settings.conservazioneProvider === 'openapi-legal-storage';
     const path = useLegalStorage ? '/invoices_legal_storage' : '/invoices';
 
