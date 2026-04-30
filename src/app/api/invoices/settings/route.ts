@@ -24,12 +24,12 @@ const FIUMANA_DEFAULTS = {
   nazione: 'IT',
   rea: 'PO-480791',
   pec_emittente: '',
-  sender_provider: 'acube',
-  sender_endpoint: 'https://api-sandbox.acubeapi.com',
+  sender_provider: 'openapi',
+  sender_endpoint: 'https://test.sdi.openapi.it',
   sender_test_mode: 1,
   acube_numbering_sequence_name: 'FiumanaAIR',
   acube_credit_note_sequence_name: 'FiumanaAIRNC',
-  conservazione_provider: 'acube',
+  conservazione_provider: 'openapi',
   tassa_soggiorno_default_cents: 200,
 } as const;
 

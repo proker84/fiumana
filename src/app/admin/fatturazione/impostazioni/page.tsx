@@ -35,7 +35,7 @@ interface SettingsView {
   rea: string | null;
   capitaleSocialeCents: number | null;
   pecEmittente: string | null;
-  senderProvider: 'acube' | 'mock' | null;
+  senderProvider: 'acube' | 'openapi' | 'mock' | null;
   senderEndpoint: string | null;
   senderTestMode: boolean;
   senderApiKeyConfigured: boolean;
@@ -127,7 +127,7 @@ export default function FatturazioneImpostazioniPage() {
         iban: data.settings.iban,
         rea: data.settings.rea,
         pecEmittente: data.settings.pecEmittente,
-        senderProvider: data.settings.senderProvider ?? 'acube',
+        senderProvider: data.settings.senderProvider ?? 'openapi',
         senderEndpoint: data.settings.senderEndpoint,
         senderTestMode: data.settings.senderTestMode,
         acubeBusinessRegistryUuid: data.settings.acubeBusinessRegistryUuid,
@@ -340,7 +340,7 @@ export default function FatturazioneImpostazioniPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* Provider ACube */}
+      {/* Provider SDI */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       <div className="admin-card mb-6">
         <div className="flex items-center gap-3 mb-6">
@@ -348,9 +348,9 @@ export default function FatturazioneImpostazioniPage() {
             <Key className="w-5 h-5 text-blue-600" />
           </div>
           <div>
-            <h2 className="font-semibold text-gray-900">Provider ACube</h2>
+            <h2 className="font-semibold text-gray-900">Provider SDI</h2>
             <p className="text-sm text-gray-500">
-              Credenziali API e configurazione invio al SDI
+              Credenziali API e configurazione invio al Sistema di Interscambio
             </p>
           </div>
         </div>
@@ -359,15 +359,11 @@ export default function FatturazioneImpostazioniPage() {
           <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-blue-700 space-y-2">
             <p>
-              Le credenziali ACube sono email + password del tuo account.{' '}
-              <a
-                href="https://dashboard-sandbox.acubeapi.com/api-configurations"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium underline inline-flex items-center gap-1"
-              >
-                Apri dashboard ACube <ExternalLink className="w-3 h-3" />
-              </a>
+              <strong>Openapi SDI</strong>: pay-per-use 0,06 €/fattura inclusa
+              conservazione, ottimo per piccoli volumi.{' '}
+              <strong>ACube</strong>: enterprise con piano custom, adatto a chi ha
+              1000+ fatture/anno. <strong>Mock</strong>: solo per dev, non invia
+              davvero.
             </p>
             <p>
               In <strong>test mode</strong> le fatture restano nel sandbox e non vengono
@@ -377,11 +373,55 @@ export default function FatturazioneImpostazioniPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Provider SDI
+            </label>
+            <select
+              value={form.senderProvider ?? 'openapi'}
+              onChange={(e) => {
+                const next = e.target.value as 'acube' | 'openapi' | 'mock';
+                // Se l'utente sta cambiando provider e l'endpoint corrisponde al
+                // default del provider precedente, aggiorniamo l'endpoint al
+                // default del nuovo provider. Altrimenti rispettiamo l'override.
+                const acubeDefault = 'https://api-sandbox.acubeapi.com';
+                const openapiDefault = 'https://test.sdi.openapi.it';
+                const current = form.senderEndpoint ?? '';
+                let nextEndpoint = current;
+                if (
+                  current === '' ||
+                  current === acubeDefault ||
+                  current === openapiDefault
+                ) {
+                  if (next === 'acube') nextEndpoint = acubeDefault;
+                  else if (next === 'openapi') nextEndpoint = openapiDefault;
+                }
+                setForm({
+                  ...form,
+                  senderProvider: next,
+                  senderEndpoint: nextEndpoint,
+                });
+              }}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none bg-white"
+            >
+              <option value="acube">A-Cube API</option>
+              <option value="openapi">Openapi SDI</option>
+              <option value="mock">Mock (solo dev)</option>
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              Seleziona quale gateway usare per inviare le fatture al SDI.
+            </p>
+          </div>
+
           <Field
             label="Endpoint API"
             value={form.senderEndpoint ?? ''}
             onChange={(v) => setForm({ ...form, senderEndpoint: v })}
-            placeholder="https://api-sandbox.acubeapi.com"
+            placeholder={
+              form.senderProvider === 'acube'
+                ? 'https://api-sandbox.acubeapi.com'
+                : 'https://test.sdi.openapi.it'
+            }
             className="md:col-span-2"
           />
 
@@ -400,18 +440,22 @@ export default function FatturazioneImpostazioniPage() {
           </div>
 
           <Field
-            label="Email account ACube"
+            label="Username/Email API"
             value={(form as any).senderUsername ?? ''}
             onChange={(v) => setForm({ ...form, ...({ senderUsername: v } as any) })}
             placeholder="immobiliarefiumana@gmail.com"
             type="email"
-            help="Memorizzata in env (.env.local) come ACUBE_USERNAME — non salvata nel DB"
+            help={
+              form.senderProvider === 'acube'
+                ? 'Memorizzata in env (.env.local) come ACUBE_USERNAME — non salvata nel DB'
+                : 'Memorizzata in env (.env.local) come OPENAPI_USERNAME — non salvata nel DB'
+            }
             disabled
           />
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password account ACube{' '}
+              Password/API key{' '}
               {settings?.senderApiKeyConfigured && (
                 <span className="text-xs text-green-700 ml-2">✓ già configurata</span>
               )}

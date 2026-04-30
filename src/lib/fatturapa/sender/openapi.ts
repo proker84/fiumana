@@ -1,0 +1,457 @@
+/**
+ * OpenapiSender — implementazione reale del contratto InvoiceSender contro
+ * la piattaforma Openapi SDI (Open S.p.A. / openapi.com).
+ *
+ * Differenze chiave rispetto ad AcubeSender:
+ *   - Auth: HTTP Basic Auth (email + APIkey statica) → POST /token con scopes →
+ *           bearer token con TTL fino a 1 anno (cached aggressivamente)
+ *   - Endpoint OAuth e SDI separati:
+ *       sandbox: https://test.oauth.openapi.it + https://test.sdi.openapi.it
+ *       prod:    https://oauth.openapi.it      + https://sdi.openapi.it
+ *   - Stessa struttura JSON snake_case del payload FatturaPA → riusiamo il
+ *     payload-builder esistente senza modifiche
+ *   - Marking diversi: `waiting`, `delivered`, `delivered-pa`, `not-delivered`,
+ *     `rejected`, `accepted-pa`, `rejected-pa`, `deadline-terms`. Li traduciamo
+ *     internamente in (marking ACube-compat + outcome SDI) per non toccare la
+ *     state machine esistente.
+ *   - Webhook body format: `{ event, data: { invoice|notification|... } }`
+ *   - Numerazione: client-side (Openapi NON gestisce auto-numbering server-side
+ *     come fa ACube). Quindi nel payload-builder il `numero` sarà già il numero
+ *     finale, non un placeholder `getNumero(...)`.
+ *
+ * Doc ufficiale:
+ *   https://console.openapi.com/oas/en/sdi.openapi.json
+ *   https://console.openapi.com/apis/sdi/documentation
+ *   https://console.openapi.com/oas/en/oauth.openapi.json
+ */
+
+import { decrypt } from '../crypto';
+import type {
+  AcubeMarking,
+  InvoiceSender,
+  InvoiceSettings,
+  SdiLogEventType,
+  SdiNotificationOutcome,
+  SdiStatus,
+  SendContext,
+  SendResult,
+} from '../types';
+
+interface OpenapiCredentials {
+  email: string;
+  apiKey: string;
+}
+
+interface CachedToken {
+  token: string;
+  expiresAt: number; // epoch ms
+}
+
+/** Scope richiesti dal nostro client (usati nella POST /token). */
+const REQUIRED_SCOPES = [
+  'POST:sdi.openapi.it/invoices',
+  'GET:sdi.openapi.it/invoices/*',
+  'GET:sdi.openapi.it/invoices_notifications/*',
+  'POST:sdi.openapi.it/api_configurations',
+  'POST:sdi.openapi.it/business_registry_configurations',
+  'PATCH:sdi.openapi.it/business_registry_configurations/*',
+];
+
+export class OpenapiSender implements InvoiceSender {
+  readonly providerName = 'openapi' as const;
+
+  private readonly sdiBaseUrl: string;
+  private readonly oauthBaseUrl: string;
+  private readonly settings: InvoiceSettings;
+  private cachedToken: CachedToken | null = null;
+
+  constructor(settings: InvoiceSettings) {
+    this.settings = settings;
+    // Default: sandbox. L'admin può sovrascrivere via senderEndpoint.
+    const sdi = (settings.senderEndpoint ?? 'https://test.sdi.openapi.it').replace(/\/+$/, '');
+    this.sdiBaseUrl = sdi;
+    // Deriva l'endpoint OAuth dal pattern sandbox/prod del SDI
+    this.oauthBaseUrl = sdi.includes('test.sdi.openapi.it')
+      ? 'https://test.oauth.openapi.it'
+      : sdi.includes('sdi.openapi.it')
+        ? 'https://oauth.openapi.it'
+        : // se l'utente ha messo un host custom, assumiamo che oauth abbia lo stesso pattern
+          sdi.replace('://sdi.', '://oauth.').replace('://test.sdi.', '://test.oauth.');
+  }
+
+  // ─── Credenziali ─────────────────────────────────────────────────────────
+
+  private resolveStaticToken(): string | null {
+    // Modalità preferita: token persistente con scope già configurati
+    // (creato dalla console Openapi → tab Token / OAuth → "New token" con scope SDI)
+    if (process.env.OPENAPI_TOKEN) return process.env.OPENAPI_TOKEN;
+    if (this.settings.senderApiKeyEncrypted?.startsWith('token:')) {
+      // Convenzione DB: prefisso "token:" indica un token statico
+      return decrypt(this.settings.senderApiKeyEncrypted).slice('token:'.length);
+    }
+    return null;
+  }
+
+  private resolveCredentials(): OpenapiCredentials {
+    const envUser = process.env.OPENAPI_USERNAME;
+    const envKey = process.env.OPENAPI_API_KEY;
+    if (envUser && envKey) {
+      return { email: envUser, apiKey: envKey };
+    }
+    if (this.settings.senderApiKeyEncrypted) {
+      // Convenzione: cifratura del formato "email:apikey"
+      const plain = decrypt(this.settings.senderApiKeyEncrypted);
+      const idx = plain.indexOf(':');
+      if (idx > 0) {
+        return { email: plain.slice(0, idx), apiKey: plain.slice(idx + 1) };
+      }
+    }
+    throw new Error(
+      'Credenziali Openapi SDI non configurate. Setta OPENAPI_TOKEN (token statico) oppure ' +
+        'OPENAPI_USERNAME + OPENAPI_API_KEY in .env.local. Genera il token dalla console Openapi.',
+    );
+  }
+
+  // ─── Token (statico, oppure Basic auth → POST /token con scopes) ────────
+
+  private async getToken(forceRefresh = false): Promise<string> {
+    const now = Date.now();
+    if (!forceRefresh && this.cachedToken && this.cachedToken.expiresAt > now + 60_000) {
+      return this.cachedToken.token;
+    }
+
+    // Modalità preferita: token statico già configurato con scope dalla console
+    const staticToken = this.resolveStaticToken();
+    if (staticToken) {
+      // Cache 1 anno (il token statico ha la sua scadenza configurata sulla console)
+      this.cachedToken = { token: staticToken, expiresAt: now + 365 * 24 * 3600 * 1000 };
+      return staticToken;
+    }
+
+    const creds = this.resolveCredentials();
+    const basic = Buffer.from(`${creds.email}:${creds.apiKey}`).toString('base64');
+
+    const ttlSeconds = 30 * 24 * 3600; // 30 giorni — bilanciamento sicurezza/efficienza
+    const res = await fetch(`${this.oauthBaseUrl}/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Basic ${basic}`,
+      },
+      body: JSON.stringify({ scopes: REQUIRED_SCOPES, ttl: ttlSeconds }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`Openapi /token failed: HTTP ${res.status} ${body.slice(0, 300)}`);
+    }
+    const data = (await res.json()) as {
+      token?: string;
+      expire?: number;
+      success?: boolean;
+      message?: string;
+    };
+    if (!data.success || !data.token) {
+      throw new Error(`Openapi /token: token assente nella risposta (${data.message ?? '?'})`);
+    }
+    // `expire` è epoch in secondi
+    const expEpochMs = data.expire ? data.expire * 1000 : now + ttlSeconds * 1000;
+    // Lasciamo 1 ora di margine per refresh anticipato
+    this.cachedToken = { token: data.token, expiresAt: expEpochMs - 3600 * 1000 };
+    return data.token;
+  }
+
+  private async authedFetch(
+    path: string,
+    init: RequestInit & { idempotencyKey?: string } = {},
+  ): Promise<Response> {
+    const token = await this.getToken();
+    const headers = new Headers(init.headers ?? {});
+    headers.set('Authorization', `Bearer ${token}`);
+    if (!headers.has('Accept')) headers.set('Accept', 'application/json');
+    if (init.idempotencyKey) headers.set('Idempotency-Key', init.idempotencyKey);
+
+    let res = await fetch(`${this.sdiBaseUrl}${path}`, { ...init, headers });
+    if (res.status === 401) {
+      // token scaduto: refresh + retry una volta
+      const newToken = await this.getToken(true);
+      headers.set('Authorization', `Bearer ${newToken}`);
+      res = await fetch(`${this.sdiBaseUrl}${path}`, { ...init, headers });
+    }
+    return res;
+  }
+
+  // ─── send (POST /invoices o /invoices_legal_storage) ────────────────────
+
+  async send(payload: unknown, ctx: SendContext): Promise<SendResult> {
+    // Quando la BusinessRegistry ha apply_legal_storage=true E il prodotto Legalinvoice
+    // è attivo sul token, Openapi richiede l'endpoint /invoices_legal_storage per attivare
+    // la conservazione 10 anni. Usiamo /invoices base di default — opt-in esplicito tramite
+    // conservazioneProvider==='openapi-legal-storage' quando attiverai Legalinvoice.
+    const useLegalStorage =
+      this.settings.conservazioneProvider === 'openapi-legal-storage';
+    const path = useLegalStorage ? '/invoices_legal_storage' : '/invoices';
+
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    const res = await this.authedFetch(path, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      idempotencyKey: ctx.idempotencyKey,
+      headers,
+    });
+
+    const text = await res.text();
+    let parsed: any = null;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch {
+      // non JSON
+    }
+
+    if (!res.ok) {
+      const msg =
+        parsed?.message ??
+        parsed?.error ??
+        parsed?.detail ??
+        text.slice(0, 500);
+      const error: any = new Error(
+        `Openapi POST /invoices failed: HTTP ${res.status} - ${msg}`,
+      );
+      error.status = res.status;
+      error.body = parsed ?? text;
+      throw error;
+    }
+
+    // Schema risposta: { data: { uuid }, success: true }
+    const uuid = parsed?.data?.uuid ?? parsed?.uuid;
+    if (!uuid) {
+      throw new Error(`Openapi POST /invoices: risposta senza uuid: ${text.slice(0, 300)}`);
+    }
+    return {
+      externalId: String(uuid),
+      acceptedAt: new Date(),
+      rawResponse: parsed,
+    };
+  }
+
+  // ─── getStatus (GET /invoices/{uuid}) ───────────────────────────────────
+
+  async getStatus(externalId: string): Promise<SdiStatus> {
+    const res = await this.authedFetch(`/invoices/${encodeURIComponent(externalId)}`);
+    const text = await res.text();
+    let parsed: any = null;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch {
+      /* */
+    }
+
+    if (!res.ok) {
+      throw new Error(
+        `Openapi GET /invoices/${externalId} HTTP ${res.status} - ${text.slice(0, 200)}`,
+      );
+    }
+
+    // Schema: { data: { marking, notifications: [], notice, ... }, success: true }
+    const body = parsed?.data ?? parsed;
+    const openapiMarking: string = body?.marking ?? 'waiting';
+    const mapped = mapOpenapiMarking(openapiMarking);
+
+    return {
+      marking: mapped.marking,
+      outcome: mapped.outcome,
+      occurredAt: new Date(),
+      errorMessage: body?.notice || body?.retry_information || undefined,
+      ricevutaUrl: body?.preserved_document?.legal_storage_receipt ?? null,
+      rawResponse: body,
+    };
+  }
+
+  // ─── downloadReceipt (GET /invoices/{uuid}) ─────────────────────────────
+  // Openapi serve il file XML originale via `GET /invoices/{uuid}` con
+  // Accept: application/xml. Endpoint dedicato `/file` non esiste come ACube.
+
+  async downloadReceipt(externalId: string): Promise<Buffer | null> {
+    const res = await this.authedFetch(`/invoices/${encodeURIComponent(externalId)}`, {
+      headers: { Accept: 'application/xml' },
+    });
+    if (!res.ok) return null;
+    const arrayBuf = await res.arrayBuffer();
+    return Buffer.from(arrayBuf);
+  }
+
+  // ─── parseWebhook ───────────────────────────────────────────────────────
+  // Body Openapi: { event: string, data: { invoice|notification|... } }
+
+  parseWebhook(
+    headers: Record<string, string>,
+    body: unknown,
+  ): { externalId: string; status: SdiStatus; eventType: SdiLogEventType } | null {
+    if (!body || typeof body !== 'object') return null;
+    const b = body as Record<string, any>;
+    const event: string = String(b.event ?? '');
+    const data = (b.data ?? {}) as Record<string, any>;
+
+    // 1) customer-notification → notifica SDI (RC/MC/NS/NE/DT/AT)
+    if (event === 'customer-notification' && data.notification) {
+      const n = data.notification;
+      const invoiceUuid = String(n.invoice_uuid ?? '');
+      if (!invoiceUuid) return null;
+      const outcome = (typeof n.type === 'string' ? n.type.toUpperCase() : null) as
+        | SdiNotificationOutcome
+        | null;
+      // notice/lista_errori per il caso NS
+      const errors = n.message?.lista_errori;
+      let errorMessage: string | undefined;
+      if (errors) {
+        const e = Array.isArray(errors.Errore) ? errors.Errore[0] : errors.Errore;
+        if (e) errorMessage = `${e.Codice ?? ''} ${e.Descrizione ?? ''}`.trim();
+      }
+      return {
+        externalId: invoiceUuid,
+        eventType: 'customer-notification',
+        status: {
+          marking: 'sent', // sempre 'sent' per coerenza con state-machine quando arriva una notifica SDI
+          outcome,
+          occurredAt: parseDate(n.created_at) ?? new Date(),
+          errorMessage,
+          ricevutaUrl: typeof n.message?.nome_file === 'string' ? n.message.nome_file : null,
+          rawResponse: body,
+        },
+      };
+    }
+
+    // 2) supplier-invoice → fattura passiva ricevuta dal SDI (NON è la nostra
+    //    fattura attiva inviata; è una fattura passiva che arriva da un fornitore).
+    //    Per ora la passiamo al log ma non aggiorniamo nessuna invoice.
+    if (event === 'supplier-invoice' && data.invoice) {
+      const invoiceUuid = String(data.invoice.uuid ?? '');
+      if (!invoiceUuid) return null;
+      return {
+        externalId: invoiceUuid,
+        eventType: 'webhook_received',
+        status: {
+          marking: 'sent',
+          outcome: null,
+          occurredAt: parseDate(data.invoice.created_at) ?? new Date(),
+          rawResponse: body,
+        },
+      };
+    }
+
+    // 3) customer-invoice — interpretazione di Openapi: NON sicura al 100%.
+    //    Per la nostra logica trattiamo come "fattura attiva confermata".
+    if (event === 'customer-invoice' && data.invoice) {
+      const invoiceUuid = String(data.invoice.uuid ?? '');
+      if (!invoiceUuid) return null;
+      return {
+        externalId: invoiceUuid,
+        eventType: 'customer-invoice',
+        status: {
+          marking: 'sent',
+          outcome: null,
+          occurredAt: parseDate(data.invoice.created_at) ?? new Date(),
+          rawResponse: body,
+        },
+      };
+    }
+
+    // 4) invoice-status-quarantena
+    if (event === 'invoice-status-quarantena' && data.invoice) {
+      return {
+        externalId: String(data.invoice.uuid ?? ''),
+        eventType: 'invoice-status-quarantena',
+        status: {
+          marking: 'quarantena',
+          outcome: null,
+          occurredAt: new Date(),
+          errorMessage: typeof data.invoice.notice === 'string' ? data.invoice.notice : undefined,
+          rawResponse: body,
+        },
+      };
+    }
+
+    // 5) invoice-status-invoice-error
+    if (event === 'invoice-status-invoice-error' && data.invoice) {
+      return {
+        externalId: String(data.invoice.uuid ?? ''),
+        eventType: 'invoice-status-invoice-error',
+        status: {
+          marking: 'invoice-error',
+          outcome: null,
+          occurredAt: new Date(),
+          errorMessage: typeof data.invoice.notice === 'string' ? data.invoice.notice : undefined,
+          rawResponse: body,
+        },
+      };
+    }
+
+    // 6) legal-storage-receipt
+    if (event === 'legal-storage-receipt') {
+      const invoiceUuid = String(
+        data.invoice_uuid ?? data.invoice?.uuid ?? data.preserved_document?.invoice_uuid ?? '',
+      );
+      if (!invoiceUuid) return null;
+      return {
+        externalId: invoiceUuid,
+        eventType: 'legal-storage-receipt',
+        status: {
+          marking: 'sent',
+          outcome: null,
+          occurredAt: parseDate(data.created_at) ?? new Date(),
+          ricevutaUrl: typeof data.file === 'string' ? data.file : null,
+          rawResponse: body,
+        },
+      };
+    }
+
+    return null;
+  }
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+function parseDate(v: unknown): Date | null {
+  if (typeof v !== 'string') return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Traduce un marking Openapi in (marking ACube-compat + outcome SDI), così la
+ * state-machine esistente continua a funzionare senza modifiche.
+ *
+ * Mapping:
+ *   waiting          → marking=waiting, outcome=null      → stato locale: accettata_acube
+ *   delivered        → marking=sent,    outcome=RC        → stato locale: consegnata
+ *   delivered-pa     → marking=sent,    outcome=RC        → stato locale: consegnata
+ *   accepted-pa      → marking=sent,    outcome=NE        → stato locale: inviata_sdi
+ *   rejected         → marking=sent,    outcome=NS        → stato locale: scartata
+ *   rejected-pa      → marking=sent,    outcome=NS        → stato locale: scartata
+ *   not-delivered    → marking=sent,    outcome=MC        → stato locale: mancata_consegna
+ *   deadline-terms   → marking=sent,    outcome=DT        → stato locale: consegnata
+ */
+function mapOpenapiMarking(openapiMarking: string): {
+  marking: AcubeMarking;
+  outcome: SdiNotificationOutcome | null;
+} {
+  switch (openapiMarking) {
+    case 'waiting':
+      return { marking: 'waiting', outcome: null };
+    case 'delivered':
+    case 'delivered-pa':
+      return { marking: 'sent', outcome: 'RC' };
+    case 'accepted-pa':
+      return { marking: 'sent', outcome: 'NE' };
+    case 'rejected':
+    case 'rejected-pa':
+      return { marking: 'sent', outcome: 'NS' };
+    case 'not-delivered':
+      return { marking: 'sent', outcome: 'MC' };
+    case 'deadline-terms':
+      return { marking: 'sent', outcome: 'DT' };
+    default:
+      // Fallback prudenziale: sconosciuto = waiting
+      return { marking: 'waiting', outcome: null };
+  }
+}

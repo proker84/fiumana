@@ -197,7 +197,7 @@ export interface InvoiceSettings {
   capitaleSocialeCents?: number | null;
   pecEmittente?: string | null;
 
-  senderProvider?: 'acube' | 'mock' | null;
+  senderProvider?: 'acube' | 'openapi' | 'mock' | null;
   senderApiKeyEncrypted?: string | null;
   senderEndpoint?: string | null;
   senderTestMode: boolean;
@@ -272,7 +272,7 @@ export interface SdiStatus {
 }
 
 export interface InvoiceSender {
-  readonly providerName: 'acube' | 'mock';
+  readonly providerName: 'acube' | 'openapi' | 'mock';
   send(payload: unknown, ctx: SendContext): Promise<SendResult>;
   getStatus(externalId: string): Promise<SdiStatus>;
   downloadReceipt(externalId: string): Promise<Buffer | null>;

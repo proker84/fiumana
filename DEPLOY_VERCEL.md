@@ -106,11 +106,24 @@ se preferisci tenere Preview/Dev sul Mac).
 | Nome | Valore | Note |
 |---|---|---|
 | **`INVOICE_ENCRYPTION_KEY`** | la chiave del passo 0 | OBBLIGATORIA in prod, l'avvio fallisce se manca |
-| **`ACUBE_USERNAME`** | la tua email account ACube | la stessa che usi sulla dashboard sandbox |
-| **`ACUBE_PASSWORD`** | la tua password ACube | viene letta solo dal server, mai esposta |
-| **`ACUBE_API_BASE_URL`** | `https://api-sandbox.acubeapi.com` | per ora sandbox, in futuro `https://api.acubeapi.com` per produzione |
+| `ACUBE_USERNAME` | la tua email account ACube | OPZIONALE — solo se usi provider `acube` |
+| `ACUBE_PASSWORD` | la tua password ACube | OPZIONALE — solo se usi provider `acube` |
+| `ACUBE_API_BASE_URL` | `https://api-sandbox.acubeapi.com` | OPZIONALE — sandbox o `https://api.acubeapi.com` per produzione ACube |
+| **`OPENAPI_USERNAME`** | username/email account Openapi SDI | richiesta se usi provider `openapi` |
+| **`OPENAPI_API_KEY`** | API key Openapi (in caso usino API key invece di password) | richiesta se usi provider `openapi` |
+| **`OPENAPI_API_BASE_URL`** | `https://test.sdi.openapi.it` per sandbox, `https://sdi.openapi.it` per produzione | richiesta se usi provider `openapi` |
 
-> ⚠️ **`INVOICE_ENCRYPTION_KEY`** e `ACUBE_*` sono "Encrypted" by default su Vercel: nessuno (incluso te) potrà rileggere il valore dal pannello dopo averlo salvato. Conservali altrove.
+> ⚠️ **`INVOICE_ENCRYPTION_KEY`**, `ACUBE_*` e `OPENAPI_*` sono "Encrypted" by default su Vercel: nessuno (incluso te) potrà rileggere il valore dal pannello dopo averlo salvato. Conservali altrove.
+
+### Pricing — confronto provider
+
+| Provider | Modello | Costo indicativo (40 fatture/anno) | Note |
+|---|---|---|---|
+| **ACube** | Abbonamento annuale | ~600 €/anno | Conviene oltre i 1000+ documenti/anno; piano custom |
+| **Openapi SDI** | Pay-per-use 0,06 €/fattura | ~2,40 €/anno | Conservazione decennale inclusa, nessun canone fisso |
+| Mock | — | gratis | Solo dev/test, non invia al SDI reale |
+
+Per il volume Fiumana attuale (~40 fatture/anno) Openapi è circa 250× più economico.
 
 Dopo aver aggiunto le env, vai su **Deployments → ultima** → menù `…` → **Redeploy** per applicarle al deploy corrente.
 
