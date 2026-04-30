@@ -129,6 +129,33 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
     }
 
+    // ─── 4b. Allocazione numero client-side ─────────────────────────────
+    // Openapi (a differenza di ACube) NON ha sequenze auto-numbering server-side
+    // → dobbiamo assegnare numero+anno+numeroCompleto qui, persistere nel DB,
+    // e poi passarli al payload-builder. Skippa per fatture già numerate
+    // (es. retry di un invio fallito) per evitare buchi nella sequenza.
+    if (lockedInv.numero === null || lockedInv.numeroCompleto === null) {
+      const annoFt = new Date(lockedInv.dataDocumento).getFullYear();
+      const sezionale = lockedInv.sezionale || '';
+      const lastRow = await dbQueryOne(
+        `SELECT COALESCE(MAX(numero), 0) AS max_num
+           FROM invoices
+           WHERE sezionale = ? AND anno = ? AND numero IS NOT NULL`,
+        [sezionale, annoFt],
+      );
+      const nextNumero = Number((lastRow as any)?.max_num ?? 0) + 1;
+      const numeroCompleto = `${nextNumero}/${annoFt}`;
+      await dbExecute(
+        `UPDATE invoices
+           SET numero = ?, anno = ?, numero_completo = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+        [nextNumero, annoFt, numeroCompleto, id],
+      );
+      lockedInv.numero = nextNumero;
+      lockedInv.anno = annoFt;
+      lockedInv.numeroCompleto = numeroCompleto;
+    }
+
     // ─── 5. Build payload ────────────────────────────────────────────────
     const payload = buildAcubePayload({
       invoice: lockedInv,
