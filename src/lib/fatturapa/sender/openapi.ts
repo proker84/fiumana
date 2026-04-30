@@ -188,13 +188,11 @@ export class OpenapiSender implements InvoiceSender {
   async send(payload: unknown, ctx: SendContext): Promise<SendResult> {
     // La BusinessRegistry per Fiumana è stata creata con apply_legal_storage=true
     // (vedi scripts/openapi-setup.ts) → Openapi rifiuta /invoices con HTTP 412 e
-    // pretende /invoices_legal_storage. Quando conservazioneProvider è 'openapi'
-    // (default Fiumana) usiamo l'endpoint con conservazione. Per disattivare in
-    // modo esplicito, settare conservazioneProvider='none' (o null) lato DB.
-    const useLegalStorage =
-      this.settings.conservazioneProvider === 'openapi' ||
-      this.settings.conservazioneProvider === 'openapi-legal-storage';
-    const path = useLegalStorage ? '/invoices_legal_storage' : '/invoices';
+    // pretende /invoices_legal_storage. Routing:
+    //   - default Openapi  → /invoices_legal_storage (conservazione 10 anni)
+    //   - opt-out esplicito → /invoices  (settando conservazioneProvider='none')
+    const optOut = this.settings.conservazioneProvider === 'none';
+    const path = optOut ? '/invoices' : '/invoices_legal_storage';
 
     // Openapi POST /invoices accetta SOLO application/xml. Il body JSON snake_case
     // della doc è solo per descrivere la struttura — va serializzato come XML
@@ -209,12 +207,33 @@ export class OpenapiSender implements InvoiceSender {
     });
     const xml = jsonToFatturaPaXml(enriched);
     const headers = new Headers({ 'Content-Type': 'application/xml' });
-    const res = await this.authedFetch(path, {
+    let res = await this.authedFetch(path, {
       method: 'POST',
       body: xml,
       idempotencyKey: ctx.idempotencyKey,
       headers,
     });
+
+    // Auto-fallback: se 412 ci dice che dobbiamo usare l'altro endpoint, retry
+    // sull'endpoint corretto. Robustezza extra contro mismatch tra BR
+    // (apply_legal_storage) e settings (conservazioneProvider) nel DB.
+    if (res.status === 412) {
+      const errText = (await res.clone().text()).toLowerCase();
+      let altPath: string | null = null;
+      if (path === '/invoices' && errText.includes('invoices_legal_storage')) {
+        altPath = '/invoices_legal_storage';
+      } else if (path === '/invoices_legal_storage' && errText.includes('/invoices')) {
+        altPath = '/invoices';
+      }
+      if (altPath) {
+        res = await this.authedFetch(altPath, {
+          method: 'POST',
+          body: xml,
+          idempotencyKey: ctx.idempotencyKey,
+          headers,
+        });
+      }
+    }
 
     const text = await res.text();
     let parsed: any = null;
