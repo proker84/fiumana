@@ -25,6 +25,8 @@
  *   https://console.openapi.com/oas/en/oauth.openapi.json
  */
 
+import { Builder } from 'xml2js';
+
 import { decrypt } from '../crypto';
 import type {
   AcubeMarking,
@@ -192,10 +194,22 @@ export class OpenapiSender implements InvoiceSender {
       this.settings.conservazioneProvider === 'openapi-legal-storage';
     const path = useLegalStorage ? '/invoices_legal_storage' : '/invoices';
 
-    const headers = new Headers({ 'Content-Type': 'application/json' });
+    // Openapi POST /invoices accetta SOLO application/xml. Il body JSON snake_case
+    // della doc è solo per descrivere la struttura — va serializzato come XML
+    // FatturaPA con tag PascalCase + namespace ufficiale AdE.
+    //
+    // Inoltre: il payload-builder è stato pensato per ACube, che auto-compila
+    // dentro `dati_trasmissione` i campi `id_trasmittente`, `progressivo_invio` e
+    // `formato_trasmissione`. Openapi NON li auto-compila → li iniettiamo qui.
+    const enriched = enrichForFatturaPaSchema(payload, {
+      partitaIva: this.settings.partitaIva ?? this.settings.codiceFiscale ?? '',
+      progressivoInvio: deriveProgressivo(ctx.idempotencyKey),
+    });
+    const xml = jsonToFatturaPaXml(enriched);
+    const headers = new Headers({ 'Content-Type': 'application/xml' });
     const res = await this.authedFetch(path, {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: xml,
       idempotencyKey: ctx.idempotencyKey,
       headers,
     });
@@ -407,6 +421,124 @@ export class OpenapiSender implements InvoiceSender {
 
     return null;
   }
+}
+
+// ─── Conversione JSON snake_case → XML FatturaPA 1.2.2 ─────────────────────
+
+/**
+ * Genera un ProgressivoInvio (max 10 alfanumerici, FatturaPA spec) a partire
+ * dall'idempotency key oppure dal timestamp corrente.
+ */
+function deriveProgressivo(idempotencyKey?: string): string {
+  if (idempotencyKey) {
+    // tieni solo alfanumerici, prendi gli ultimi 10
+    const clean = idempotencyKey.replace(/[^A-Za-z0-9]/g, '');
+    return (clean.slice(-10) || Date.now().toString().slice(-10)).toUpperCase();
+  }
+  return Date.now().toString().slice(-10);
+}
+
+/**
+ * Arricchisce il payload "ACube-style" con i campi obbligatori che ACube
+ * compilava lato server e Openapi pretende già nel body. Riordina anche le
+ * chiavi di `dati_trasmissione` rispettando la sequence dello schema FatturaPA.
+ */
+function enrichForFatturaPaSchema(
+  payload: unknown,
+  ctx: { partitaIva: string; progressivoInvio: string },
+): unknown {
+  if (!payload || typeof payload !== 'object') return payload;
+  const root = payload as any;
+  const header = root.fattura_elettronica_header;
+  if (!header || typeof header !== 'object') return payload;
+  const dt = header.dati_trasmissione ?? {};
+
+  // Ordine richiesto dallo schema FatturaPA 1.2.2:
+  //   IdTrasmittente, ProgressivoInvio, FormatoTrasmissione, CodiceDestinatario,
+  //   ContattiTrasmittente?, PECDestinatario?
+  const newDt: Record<string, unknown> = {};
+  newDt.id_trasmittente = dt.id_trasmittente ?? {
+    id_paese: 'IT',
+    id_codice: ctx.partitaIva,
+  };
+  newDt.progressivo_invio = dt.progressivo_invio ?? ctx.progressivoInvio;
+  newDt.formato_trasmissione = dt.formato_trasmissione ?? 'FPR12';
+  newDt.codice_destinatario = dt.codice_destinatario ?? '0000000';
+  if (dt.contatti_trasmittente) newDt.contatti_trasmittente = dt.contatti_trasmittente;
+  if (dt.pec_destinatario) newDt.pec_destinatario = dt.pec_destinatario;
+
+  // Riordino anche le chiavi del header per matchare la sequence schema:
+  //   DatiTrasmissione, CedentePrestatore, CessionarioCommittente, …
+  const newHeader: Record<string, unknown> = {
+    dati_trasmissione: newDt,
+    cedente_prestatore: header.cedente_prestatore,
+    cessionario_committente: header.cessionario_committente,
+  };
+  for (const [k, v] of Object.entries(header)) {
+    if (!(k in newHeader)) newHeader[k] = v;
+  }
+
+  return {
+    fattura_elettronica_header: newHeader,
+    fattura_elettronica_body: root.fattura_elettronica_body,
+  };
+}
+
+/**
+ * Converte snake_case in PascalCase per i tag XML FatturaPA.
+ * Es. `dati_trasmissione` → `DatiTrasmissione`, `id_paese` → `IdPaese`.
+ */
+function snakeToPascal(s: string): string {
+  return s
+    .split('_')
+    .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1) : ''))
+    .join('');
+}
+
+/**
+ * Trasforma ricorsivamente le chiavi di un oggetto da snake_case a PascalCase.
+ * Gli array sono preservati (xml2js li serializza come tag ripetuti).
+ */
+function transformKeysToPascal(obj: any): any {
+  if (Array.isArray(obj)) return obj.map(transformKeysToPascal);
+  if (obj === null || typeof obj !== 'object') return obj;
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    // Conserva chiavi speciali xml2js (es. `$` per attributi, `_` per text content)
+    if (k === '$' || k === '_') {
+      out[k] = v;
+    } else {
+      out[snakeToPascal(k)] = transformKeysToPascal(v);
+    }
+  }
+  return out;
+}
+
+/**
+ * Serializza il payload JSON snake_case nel formato XML FatturaPA 1.2.2 atteso
+ * dal SDI (e quindi da Openapi). Aggiunge il root `<p:FatturaElettronica>` con
+ * versione e namespace ufficiali AdE.
+ */
+function jsonToFatturaPaXml(payload: unknown): string {
+  const transformed = transformKeysToPascal(payload);
+  const root = {
+    'p:FatturaElettronica': {
+      $: {
+        versione: 'FPR12',
+        'xmlns:p':
+          'http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2',
+        'xmlns:ds': 'http://www.w3.org/2000/09/xmldsig#',
+        'xmlns:xsi': 'http://www.w3.org/2001/XMLSchema-instance',
+      },
+      ...(transformed as Record<string, unknown>),
+    },
+  };
+  const builder = new Builder({
+    headless: false,
+    renderOpts: { pretty: false },
+    xmldec: { version: '1.0', encoding: 'UTF-8', standalone: false },
+  });
+  return builder.buildObject(root);
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
