@@ -17,10 +17,24 @@ import type {
 } from '../src/lib/fatturapa/types';
 
 // ─── Stessa logica di sender/openapi.ts (duplicata per preview standalone) ──
+const FATTURAPA_ACRONYMS = new Set([
+  'iva',
+  'cap',
+  'rea',
+  'iban',
+  'pec',
+  'bic',
+  'abi',
+  'cab',
+]);
 function snakeToPascal(s: string): string {
   return s
     .split('_')
-    .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1) : ''))
+    .map((w) => {
+      if (w.length === 0) return '';
+      if (FATTURAPA_ACRONYMS.has(w.toLowerCase())) return w.toUpperCase();
+      return w[0].toUpperCase() + w.slice(1);
+    })
     .join('');
 }
 function transformKeysToPascal(obj: any): any {

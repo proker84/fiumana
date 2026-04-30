@@ -485,13 +485,46 @@ function enrichForFatturaPaSchema(
 }
 
 /**
- * Converte snake_case in PascalCase per i tag XML FatturaPA.
- * Es. `dati_trasmissione` → `DatiTrasmissione`, `id_paese` → `IdPaese`.
+ * Acronimi FatturaPA da preservare in MAIUSCOLO durante la conversione
+ * snake_case → PascalCase. Tag standard AdE che usano acronimi:
+ *   - AliquotaIVA, IdFiscaleIVA, EsigibilitaIVA, NaturaIVA?, etc.
+ *   - CAP (sede)
+ *   - IscrizioneREA, NumeroREA
+ *   - IBAN
+ *   - PECDestinatario
+ *   - BIC, ABI, CAB
+ * Senza questa whitelist Openapi rifiuta l'XML (schema FatturaPA validation
+ * fallisce e il loro errore è il fuorviante "missing cedente_prestatore").
+ */
+const FATTURAPA_ACRONYMS = new Set([
+  'iva',
+  'cap',
+  'rea',
+  'iban',
+  'pec',
+  'bic',
+  'abi',
+  'cab',
+]);
+
+/**
+ * Converte snake_case in PascalCase per i tag XML FatturaPA, rispettando
+ * gli acronimi che lo schema vuole TUTTI MAIUSCOLI.
+ * Es. `dati_trasmissione` → `DatiTrasmissione`,
+ *     `aliquota_iva`      → `AliquotaIVA`,
+ *     `id_fiscale_iva`    → `IdFiscaleIVA`,
+ *     `pec_destinatario`  → `PECDestinatario`,
+ *     `cap`               → `CAP`,
+ *     `numero_rea`        → `NumeroREA`.
  */
 function snakeToPascal(s: string): string {
   return s
     .split('_')
-    .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1) : ''))
+    .map((w) => {
+      if (w.length === 0) return '';
+      if (FATTURAPA_ACRONYMS.has(w.toLowerCase())) return w.toUpperCase();
+      return w[0].toUpperCase() + w.slice(1);
+    })
     .join('');
 }
 
