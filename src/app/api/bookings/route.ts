@@ -33,8 +33,12 @@ export async function GET(req: NextRequest) {
       );
       const alloggiatiPending = Number(alloggiatiPendingResult?.count || 0);
 
+      // Restituiamo TUTTE le prenotazioni ordinate per check-in crescente.
+      // Il client poi separa la "prossima imminente" (in alto come card) dal
+      // resto (tabella sotto). Niente più LIMIT — la dashboard deve mostrare
+      // tutto l'elenco senza dover andare su /admin/prenotazioni.
       const recentBookings = await dbQuery(
-        'SELECT * FROM bookings ORDER BY created_at DESC LIMIT 10'
+        'SELECT * FROM bookings ORDER BY check_in ASC'
       );
 
       return NextResponse.json({

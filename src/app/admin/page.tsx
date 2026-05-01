@@ -111,25 +111,23 @@ Fabio & David`;
     setTimeout(() => setCopiedId(null), 2000);
   }
 
-  // Ordina per check-in e trova la prossima prenotazione
-  const sortedBookings = data?.recentBookings ? [...data.recentBookings].sort((a, b) => {
-    const dateA = new Date(a.check_in);
-    const dateB = new Date(b.check_in);
-    return dateA.getTime() - dateB.getTime();
-  }) : [];
-
+  // Trova la prossima prenotazione imminente, poi ordina le altre con
+  // criterio "futuro prima del passato": future per check_in crescente
+  // (la più imminente in cima), passate per check_in decrescente (le più
+  // recenti in cima).
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const nextBooking = sortedBookings.find(b => {
-    const checkIn = new Date(b.check_in);
-    checkIn.setHours(0, 0, 0, 0);
-    return checkIn >= today;
-  });
+  const all = data?.recentBookings ?? [];
+  const future = all.filter((b) => new Date(b.check_in) >= today);
+  const past = all.filter((b) => new Date(b.check_in) < today);
+  future.sort((a, b) => new Date(a.check_in).getTime() - new Date(b.check_in).getTime());
+  past.sort((a, b) => new Date(b.check_in).getTime() - new Date(a.check_in).getTime());
 
+  const nextBooking = future[0];
   const otherBookings = nextBooking
-    ? sortedBookings.filter(b => b.id !== nextBooking.id)
-    : sortedBookings;
+    ? [...future.slice(1), ...past]
+    : [...future, ...past];
 
   async function fetchDashboard() {
     try {
