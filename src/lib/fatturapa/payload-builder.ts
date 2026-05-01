@@ -188,35 +188,56 @@ function buildCessionario(c: Customer): CessionarioPayload {
     nazione: c.nazione ?? 'IT',
   };
 
-  const dati_anagrafici: CessionarioPayload['dati_anagrafici'] = {
-    anagrafica: {},
-  };
-
+  // Anagrafica (Denominazione XOR Nome+Cognome)
+  const anagrafica: { denominazione?: string; nome?: string; cognome?: string } = {};
   if (c.tipo === 'PG' && c.ragioneSociale) {
-    dati_anagrafici.anagrafica.denominazione = sanitizeText(c.ragioneSociale);
+    anagrafica.denominazione = sanitizeText(c.ragioneSociale);
   } else {
-    if (c.cognome) dati_anagrafici.anagrafica.cognome = sanitizeText(c.cognome);
-    if (c.nome) dati_anagrafici.anagrafica.nome = sanitizeText(c.nome);
+    if (c.cognome) anagrafica.cognome = sanitizeText(c.cognome);
+    if (c.nome) anagrafica.nome = sanitizeText(c.nome);
   }
 
-  // Regole di compilazione:
-  //   - Cliente con P.IVA italiana (azienda IT): id_fiscale_iva valorizzato
-  //   - Cliente con P.IVA estera: id_fiscale_iva con id_paese del cliente
-  //   - Cliente privato italiano: solo codice_fiscale (16 char)
-  //   - Cliente privato estero: codice_fiscale = '0000000' (convenzione AdE per esteri non identificati)
+  // Regole di compilazione (FatturaPA 1.2.2 — CessionarioCommittente):
+  //
+  // Lo schema richiede ESATTAMENTE UNO tra IdFiscaleIVA o CodiceFiscale:
+  //   - Cliente con P.IVA (IT o estera) → IdFiscaleIVA(id_paese, id_codice)
+  //   - Privato italiano con CF        → CodiceFiscale (16 char)
+  //   - Privato ESTERO senza P.IVA     → IdFiscaleIVA(id_paese=Nazione estera,
+  //                                       id_codice='99999999999' placeholder).
+  //     NON usare CodiceFiscale='0000000' (causa scarto AdE 00301:
+  //     "CodiceFiscale formalmente non valido"). La convenzione consolidata
+  //     è id_codice di soli "9" (11 caratteri) — accettata da AdE.
+  //   - Italiano senza CF noto         → fallback CodiceFiscale='0000000' (resta
+  //     un caso anomalo: il customer-mapper dovrebbe già aver bloccato il flusso).
+  let idFiscaleIva: { id_paese: string; id_codice: string } | undefined;
+  let codiceFiscale: string | undefined;
   if (c.partitaIva) {
-    dati_anagrafici.id_fiscale_iva = {
+    idFiscaleIva = {
       id_paese: c.nazione,
       id_codice: c.partitaIva.replace(/^IT/i, ''),
     };
-  } else if (c.codiceFiscale && !c.isEstero) {
-    dati_anagrafici.codice_fiscale = c.codiceFiscale;
   } else if (c.isEstero) {
-    dati_anagrafici.codice_fiscale = '0000000';
+    idFiscaleIva = {
+      id_paese: (c.nazione && c.nazione !== 'IT' ? c.nazione : 'XX').toUpperCase(),
+      id_codice:
+        c.codiceFiscale && c.codiceFiscale.replace(/[^A-Za-z0-9]/g, '').length >= 2
+          ? c.codiceFiscale.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+          : '99999999999',
+    };
+  } else if (c.codiceFiscale) {
+    codiceFiscale = c.codiceFiscale;
   } else {
     // Italiano senza CF noto — fallback (la validazione customer-mapper avrà già protestato)
-    dati_anagrafici.codice_fiscale = '0000000';
+    codiceFiscale = '0000000';
   }
+
+  // Ordine FatturaPA schema: IdFiscaleIVA → CodiceFiscale → Anagrafica.
+  // Costruisco l'oggetto inserendo le chiavi nell'ordine richiesto (JS preserva
+  // insertion order). NON pre-inizializzare anagrafica nel literal iniziale.
+  const dati_anagrafici = {} as CessionarioPayload['dati_anagrafici'];
+  if (idFiscaleIva) dati_anagrafici.id_fiscale_iva = idFiscaleIva;
+  if (codiceFiscale) dati_anagrafici.codice_fiscale = codiceFiscale;
+  dati_anagrafici.anagrafica = anagrafica;
 
   return { dati_anagrafici, sede };
 }

@@ -195,7 +195,7 @@ export default function FatturazioneImpostazioniPage() {
       setMessage({
         type: 'success',
         text:
-          'Webhook secret salvato. Adesso usalo come "Authentication token" (con prefisso "Bearer ") nelle 5 ApiConfiguration ACube.',
+          'Webhook secret salvato. Adesso usalo come "Authentication token" (con prefisso "Bearer ") nelle ApiConfiguration del provider SDI (Openapi/ACube).',
       });
       // teniamo il valore in chiaro a video finché l'admin non chiude la pagina,
       // così può copiarlo se l'aveva perso dagli appunti
@@ -227,7 +227,7 @@ export default function FatturazioneImpostazioniPage() {
           Fatturazione — Impostazioni
         </h1>
         <p className="text-gray-500 text-sm mt-1">
-          Anagrafica emittente, credenziali ACube, numerazione e webhook
+          Anagrafica emittente, credenziali provider SDI, numerazione e webhook
         </p>
       </div>
 
@@ -490,7 +490,13 @@ export default function FatturazioneImpostazioniPage() {
             value={form.acubeBusinessRegistryUuid ?? ''}
             onChange={(v) => setForm({ ...form, acubeBusinessRegistryUuid: v })}
             placeholder="01940abc-1234-7def-..."
-            help="Lo trovi nella pagina /business-registry-configurations della dashboard ACube"
+            help={
+              form.senderProvider === 'acube'
+                ? 'Lo trovi nella pagina /business-registry-configurations della dashboard ACube'
+                : form.senderProvider === 'openapi'
+                  ? 'Lo trovi su console.openapi.com → SDI → Business Registry. Per Openapi non è obbligatorio: è auto-creato dallo script openapi-setup.ts'
+                  : 'UUID della BusinessRegistry sul provider configurato'
+            }
             className="md:col-span-2"
             mono
           />
@@ -508,7 +514,9 @@ export default function FatturazioneImpostazioniPage() {
           <div>
             <h2 className="font-semibold text-gray-900">Sequenze numerazione</h2>
             <p className="text-sm text-gray-500">
-              ACube gestisce la numerazione progressiva delle fatture
+              {form.senderProvider === 'acube'
+                ? 'ACube gestisce la numerazione progressiva delle fatture'
+                : 'Numerazione progressiva client-side (Openapi non ha sequenze server-side)'}
             </p>
           </div>
         </div>
@@ -569,7 +577,7 @@ export default function FatturazioneImpostazioniPage() {
           <div>
             <h2 className="font-semibold text-gray-900">Webhook secret</h2>
             <p className="text-sm text-gray-500">
-              Token bearer che ACube invierà nei webhook in ingresso
+              Token bearer che il provider SDI invierà nei webhook in ingresso
             </p>
           </div>
         </div>
@@ -577,20 +585,31 @@ export default function FatturazioneImpostazioniPage() {
         <div className="bg-amber-50 rounded-xl p-4 mb-6 flex gap-3">
           <Info className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-amber-700">
-            Genera un token nuovo qui, poi vai su{' '}
-            <a
-              href="https://dashboard-sandbox.acubeapi.com/api-configurations"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium underline inline-flex items-center gap-1"
-            >
-              ApiConfiguration <ExternalLink className="w-3 h-3" />
-            </a>{' '}
-            e crea 5 webhook (uno per evento) con
+            Genera un token nuovo qui, poi vai sulla dashboard del provider SDI configurato e
+            crea le ApiConfiguration / webhook (una per evento) con{' '}
             <code className="bg-white px-1.5 mx-1 rounded">authentication_type = header</code>,{' '}
-            <code className="bg-white px-1.5 mx-1 rounded">authentication_key = Authorization</code>
-            {' '}e{' '}
-            <code className="bg-white px-1.5 mx-1 rounded">authentication_token = Bearer &lt;questo token&gt;</code>.
+            <code className="bg-white px-1.5 mx-1 rounded">authentication_key = Authorization</code>{' '}
+            e{' '}
+            <code className="bg-white px-1.5 mx-1 rounded">authentication_token = Bearer &lt;questo token&gt;</code>.{' '}
+            {form.senderProvider === 'acube' ? (
+              <a
+                href="https://dashboard-sandbox.acubeapi.com/api-configurations"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium underline inline-flex items-center gap-1"
+              >
+                Apri dashboard ACube <ExternalLink className="w-3 h-3" />
+              </a>
+            ) : (
+              <a
+                href="https://console.openapi.com/apis/sdi/dashboard"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium underline inline-flex items-center gap-1"
+              >
+                Apri console Openapi <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
           </div>
         </div>
 

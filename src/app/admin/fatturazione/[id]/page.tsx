@@ -248,7 +248,7 @@ export default function InvoiceDetailPage() {
       setShowSendConfirm(false);
       setMessage({
         type: 'success',
-        text: `Inviata via ${data.provider}. UUID ACube: ${data.externalId}`,
+        text: `Inviata via ${data.provider}. UUID SDI: ${data.externalId}`,
       });
       void load();
     } catch (e: any) {
@@ -341,7 +341,7 @@ export default function InvoiceDetailPage() {
               className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 text-sm font-medium"
             >
               <Send className="w-4 h-4" />
-              Invia ad ACube
+              Invia al SDI
             </button>
           )}
           {invoice.externalId && (
@@ -350,14 +350,14 @@ export default function InvoiceDetailPage() {
                 onClick={syncFromAcube}
                 disabled={polling}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-100 text-sm font-medium disabled:opacity-50"
-                title="Pulla lo stato direttamente da ACube (fallback se i webhook non arrivano)"
+                title="Pulla lo stato direttamente dal provider SDI (fallback se i webhook non arrivano)"
               >
                 {polling ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <RefreshCw className="w-4 h-4" />
                 )}
-                Sincronizza con ACube
+                Sincronizza stato SDI
               </button>
               <button
                 onClick={load}
@@ -404,7 +404,7 @@ export default function InvoiceDetailPage() {
       {invoice.externalId && (
         <div className="admin-card mb-6 flex flex-wrap items-center gap-6 text-sm">
           <div>
-            <span className="text-xs text-gray-400 uppercase tracking-wider">UUID ACube</span>
+            <span className="text-xs text-gray-400 uppercase tracking-wider">UUID SDI</span>
             <p className="font-mono text-gray-700 mt-0.5 flex items-center gap-2">
               {invoice.externalId.slice(0, 8)}…{invoice.externalId.slice(-8)}
               <button
@@ -417,7 +417,7 @@ export default function InvoiceDetailPage() {
             </p>
           </div>
           <div>
-            <span className="text-xs text-gray-400 uppercase tracking-wider">Marking ACube</span>
+            <span className="text-xs text-gray-400 uppercase tracking-wider">Marking SDI</span>
             <p className="text-gray-700 mt-0.5">{invoice.markingAcube ?? '-'}</p>
           </div>
           <div>
@@ -644,12 +644,13 @@ export default function InvoiceDetailPage() {
 
       {/* ── Send confirm modal ─────────────────────────────────────────────── */}
       {showSendConfirm && (
-        <Modal title="Invia ad ACube" onClose={() => !sending && setShowSendConfirm(false)}>
+        <Modal title="Invia al SDI" onClose={() => !sending && setShowSendConfirm(false)}>
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-amber-700">
-              Stai per inviare la fattura ad ACube e quindi al SDI. Il numero progressivo verrà
-              assegnato automaticamente da ACube. L'operazione non è annullabile.
+              Stai per trasmettere la fattura al SDI tramite il provider configurato. Il numero
+              progressivo verrà assegnato automaticamente prima dell'invio. L'operazione non è
+              annullabile.
             </div>
           </div>
           <div className="bg-gray-50 rounded-xl p-4 mb-4 text-sm space-y-1">

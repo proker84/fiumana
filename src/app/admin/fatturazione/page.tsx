@@ -238,7 +238,7 @@ export default function FatturazioneListaPage() {
             Fatturazione
           </h1>
           <p className="text-gray-500 text-sm mt-1">
-            Fatture attive emesse via ACube → SDI
+            Fatture attive trasmesse al SDI
           </p>
         </div>
         <div className="flex gap-2">
