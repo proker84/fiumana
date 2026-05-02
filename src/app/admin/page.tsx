@@ -7,12 +7,15 @@ import {
   Users,
   Home,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   Clock,
   ArrowUpRight,
   CalendarClock,
   Copy,
   ExternalLink,
+  FileText,
+  Loader2,
   MapPin,
 } from 'lucide-react';
 
@@ -27,6 +30,12 @@ interface Booking {
   num_guests: number;
   status: string;
   alloggiati_sent: number;
+  // ─── stato fatturazione ───────────────────────────────────────────────
+  invoice_count?: number;
+  invoice_id_last?: number | null;
+  invoice_numero_last?: string | null;
+  invoice_stato_last?: string | null;
+  fatturazione_completata?: number;
 }
 
 interface DashboardData {
@@ -321,6 +330,7 @@ Fabio & David`;
                   <th className="pb-3 pr-4">Check-in</th>
                   <th className="pb-3 pr-4">Check-out</th>
                   <th className="pb-3 pr-4">Alloggiati</th>
+                  <th className="pb-3 pr-4">Fattura</th>
                   <th className="pb-3">Link Ospiti</th>
                 </tr>
               </thead>
@@ -352,6 +362,9 @@ Fabio & David`;
                           <Clock className="w-3 h-3" /> Pendente
                         </span>
                       )}
+                    </td>
+                    <td className="py-3 pr-4">
+                      <FatturaBadge booking={b} />
                     </td>
                     <td className="py-3">
                       <div className="flex items-center gap-2">
@@ -402,5 +415,57 @@ Fabio & David`;
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Badge stato fattura per riga booking ─────────────────────────────────
+function FatturaBadge({ booking }: { booking: Booking }) {
+  const stato = booking.invoice_stato_last;
+  const numero = booking.invoice_numero_last;
+  const id = booking.invoice_id_last;
+  if (!stato || !id) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+        <FileText className="w-3 h-3" /> Da emettere
+      </span>
+    );
+  }
+  const isCompleted =
+    !!booking.fatturazione_completata ||
+    stato === 'consegnata' ||
+    stato === 'mancata_consegna' ||
+    stato === 'inviata_sdi';
+  const isError = stato === 'scartata' || stato === 'errore_invio';
+  const isInProgress =
+    stato === 'in_invio' || stato === 'accettata_acube' || stato === 'quarantena';
+  const isDraft = stato === 'bozza';
+
+  let cls = 'text-amber-700 bg-amber-50';
+  let Icon = Clock;
+  let label: string = numero || '-';
+
+  if (isCompleted) {
+    cls = 'text-green-700 bg-green-50';
+    Icon = CheckCircle2;
+  } else if (isError) {
+    cls = 'text-red-700 bg-red-50';
+    Icon = AlertTriangle;
+  } else if (isInProgress) {
+    cls = 'text-blue-700 bg-blue-50';
+    Icon = Loader2;
+  } else if (isDraft) {
+    cls = 'text-gray-700 bg-gray-100';
+    Icon = FileText;
+    label = `Bozza ${numero ?? '#' + id}`;
+  }
+
+  return (
+    <Link
+      href={`/admin/fatturazione/${id}`}
+      className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${cls} hover:opacity-80 transition-opacity`}
+      title={`Stato: ${stato}`}
+    >
+      <Icon className="w-3 h-3" /> {label}
+    </Link>
   );
 }

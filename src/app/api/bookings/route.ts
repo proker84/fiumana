@@ -37,9 +37,24 @@ export async function GET(req: NextRequest) {
       // Il client poi separa la "prossima imminente" (in alto come card) dal
       // resto (tabella sotto). Niente più LIMIT — la dashboard deve mostrare
       // tutto l'elenco senza dover andare su /admin/prenotazioni.
-      const recentBookings = await dbQuery(
-        'SELECT * FROM bookings ORDER BY check_in ASC'
-      );
+      // Arricchimento stato fatturazione identico a GET /api/bookings normale.
+      const recentBookings = await dbQuery(`
+        SELECT
+          b.*,
+          (SELECT COUNT(*) FROM invoices i WHERE i.booking_id = b.id) as invoice_count,
+          (SELECT i.stato FROM invoices i WHERE i.booking_id = b.id
+             ORDER BY i.created_at DESC LIMIT 1) as invoice_stato_last,
+          (SELECT i.id FROM invoices i WHERE i.booking_id = b.id
+             ORDER BY i.created_at DESC LIMIT 1) as invoice_id_last,
+          (SELECT i.numero_completo FROM invoices i WHERE i.booking_id = b.id
+             ORDER BY i.created_at DESC LIMIT 1) as invoice_numero_last,
+          (SELECT CASE
+              WHEN MAX(CASE WHEN i.stato IN ('consegnata','mancata_consegna','inviata_sdi') THEN 1 ELSE 0 END) = 1
+              THEN 1 ELSE 0 END
+             FROM invoices i WHERE i.booking_id = b.id) as fatturazione_completata
+        FROM bookings b
+        ORDER BY b.check_in ASC
+      `);
 
       return NextResponse.json({
         totalBookings,
@@ -50,9 +65,29 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Arricchiamo ogni booking con:
+    //   - guests_count: quanti ospiti hanno compilato il form
+    //   - invoice_count: numero totale di fatture associate (di solito 0 o 1)
+    //   - invoice_stato_last: stato della fattura più recente
+    //   - invoice_id_last: id della fattura più recente (per link diretto)
+    //   - invoice_numero_last: es. "5/2026" da mostrare in UI
+    //   - fatturazione_completata: true se la fattura è stata trasmessa
+    //     correttamente al SDI (consegnata / mancata_consegna / inviata_sdi)
     const bookings = await dbQuery(`
-      SELECT b.*,
-        (SELECT COUNT(*) FROM guests g WHERE g.booking_id = b.id) as guests_count
+      SELECT
+        b.*,
+        (SELECT COUNT(*) FROM guests g WHERE g.booking_id = b.id) as guests_count,
+        (SELECT COUNT(*) FROM invoices i WHERE i.booking_id = b.id) as invoice_count,
+        (SELECT i.stato FROM invoices i WHERE i.booking_id = b.id
+           ORDER BY i.created_at DESC LIMIT 1) as invoice_stato_last,
+        (SELECT i.id FROM invoices i WHERE i.booking_id = b.id
+           ORDER BY i.created_at DESC LIMIT 1) as invoice_id_last,
+        (SELECT i.numero_completo FROM invoices i WHERE i.booking_id = b.id
+           ORDER BY i.created_at DESC LIMIT 1) as invoice_numero_last,
+        (SELECT CASE
+            WHEN MAX(CASE WHEN i.stato IN ('consegnata','mancata_consegna','inviata_sdi') THEN 1 ELSE 0 END) = 1
+            THEN 1 ELSE 0 END
+           FROM invoices i WHERE i.booking_id = b.id) as fatturazione_completata
       FROM bookings b
       ORDER BY b.check_in DESC
     `);

@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Loader2,
   MapPin,
+  FileText,
 } from 'lucide-react';
 
 interface Booking {
@@ -37,6 +38,12 @@ interface Booking {
   created_at: string;
   guests_count?: number;
   cancelled?: number;
+  // ─── stato fatturazione (arricchito server-side) ─────────────────────
+  invoice_count?: number;
+  invoice_id_last?: number | null;
+  invoice_numero_last?: string | null;
+  invoice_stato_last?: string | null;
+  fatturazione_completata?: number;
 }
 
 export default function PrenotazioniPage() {
@@ -193,15 +200,23 @@ Fabio & David`;
       b.booking_id.toLowerCase().includes(search.toLowerCase());
 
     let matchFilter = false;
+    const fattOk = !!b.fatturazione_completata;
+    const allOk = !!b.alloggiati_sent;
     if (filter === 'all') {
       // "Tutti" esclude le cancellate di default
       matchFilter = !b.cancelled;
     } else if (filter === 'cancelled') {
       matchFilter = !!b.cancelled;
     } else if (filter === 'pending') {
-      matchFilter = !b.alloggiati_sent && !b.cancelled;
+      matchFilter = !allOk && !b.cancelled;
     } else if (filter === 'sent') {
-      matchFilter = !!b.alloggiati_sent && !b.cancelled;
+      matchFilter = allOk && !b.cancelled;
+    } else if (filter === 'completed') {
+      // Workflow completo: alloggiati inviati + fattura trasmessa al SDI
+      matchFilter = allOk && fattOk && !b.cancelled;
+    } else if (filter === 'todo') {
+      // Da completare: alloggiati o fattura ancora mancanti
+      matchFilter = (!allOk || !fattOk) && !b.cancelled;
     }
 
     return matchSearch && matchFilter;
@@ -272,8 +287,10 @@ Fabio & David`;
           <div className="flex gap-2 flex-wrap">
             {[
               { key: 'all', label: 'Tutti' },
-              { key: 'pending', label: 'Da Inviare' },
-              { key: 'sent', label: 'Inviati' },
+              { key: 'todo', label: 'Da completare' },
+              { key: 'completed', label: 'Completate' },
+              { key: 'pending', label: 'Alloggiati pendenti' },
+              { key: 'sent', label: 'Alloggiati inviati' },
               { key: 'cancelled', label: 'Cancellate' },
             ].map((f) => (
               <button
@@ -329,13 +346,14 @@ Fabio & David`;
               <div className="flex flex-wrap items-center gap-2">
                 {nextBooking.alloggiati_sent ? (
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-3 py-1.5 rounded-full">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Inviato
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Alloggiati ✓
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-100 px-3 py-1.5 rounded-full">
-                    <Clock className="w-3.5 h-3.5" /> Da inviare
+                    <Clock className="w-3.5 h-3.5" /> Alloggiati pendenti
                   </span>
                 )}
+                <FatturaBadge booking={nextBooking} />
                 <button
                   onClick={() => copyLink(nextBooking)}
                   className="flex items-center gap-2 px-3 py-1.5 bg-white border border-primary-300 text-primary-700 rounded-lg text-xs font-medium hover:bg-primary-50 transition-colors"
@@ -395,6 +413,7 @@ Fabio & David`;
                   <th className="pb-3 pr-4">Date</th>
                   <th className="pb-3 pr-4">N. Ospiti</th>
                   <th className="pb-3 pr-4">Alloggiati</th>
+                  <th className="pb-3 pr-4">Fattura</th>
                   <th className="pb-3">Azioni</th>
                 </tr>
               </thead>
@@ -439,6 +458,9 @@ Fabio & David`;
                           <Clock className="w-3 h-3" /> Pendente
                         </span>
                       )}
+                    </td>
+                    <td className="py-4 pr-4">
+                      <FatturaBadge booking={b} />
                     </td>
                     <td className="py-4">
                       {b.cancelled ? (
@@ -558,5 +580,57 @@ Fabio & David`;
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Badge stato fattura per riga booking ─────────────────────────────────
+function FatturaBadge({ booking }: { booking: Booking }) {
+  const stato = booking.invoice_stato_last;
+  const numero = booking.invoice_numero_last;
+  const id = booking.invoice_id_last;
+  if (!stato || !id) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+        <FileText className="w-3 h-3" /> Da emettere
+      </span>
+    );
+  }
+  const isCompleted =
+    !!booking.fatturazione_completata ||
+    stato === 'consegnata' ||
+    stato === 'mancata_consegna' ||
+    stato === 'inviata_sdi';
+  const isError = stato === 'scartata' || stato === 'errore_invio';
+  const isInProgress =
+    stato === 'in_invio' || stato === 'accettata_acube' || stato === 'quarantena';
+  const isDraft = stato === 'bozza';
+
+  let cls = 'text-amber-700 bg-amber-50';
+  let Icon = Clock;
+  let label: string = numero || '-';
+
+  if (isCompleted) {
+    cls = 'text-green-700 bg-green-50';
+    Icon = CheckCircle2;
+  } else if (isError) {
+    cls = 'text-red-700 bg-red-50';
+    Icon = AlertTriangle;
+  } else if (isInProgress) {
+    cls = 'text-blue-700 bg-blue-50';
+    Icon = Loader2;
+  } else if (isDraft) {
+    cls = 'text-gray-700 bg-gray-100';
+    Icon = FileText;
+    label = `Bozza ${numero ?? '#' + id}`;
+  }
+
+  return (
+    <Link
+      href={`/admin/fatturazione/${id}`}
+      className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${cls} hover:opacity-80 transition-opacity`}
+      title={`Stato: ${stato}`}
+    >
+      <Icon className="w-3 h-3" /> {label}
+    </Link>
   );
 }
