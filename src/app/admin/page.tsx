@@ -30,6 +30,7 @@ interface Booking {
   num_guests: number;
   status: string;
   alloggiati_sent: number;
+  cancelled?: number; // soft-delete flag
   // ─── stato fatturazione ───────────────────────────────────────────────
   invoice_count?: number;
   invoice_id_last?: number | null;
@@ -127,7 +128,10 @@ Fabio & David`;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const all = data?.recentBookings ?? [];
+  // Escludo le prenotazioni cancellate dalla dashboard: non sono attive,
+  // non vanno in "Prossima Prenotazione" e non devono confondere il counter.
+  // Per consultarle l'utente va su /admin/prenotazioni filtro "Cancellate".
+  const all = (data?.recentBookings ?? []).filter((b) => !b.cancelled);
   const future = all.filter((b) => new Date(b.check_in) >= today);
   const past = all.filter((b) => new Date(b.check_in) < today);
   future.sort((a, b) => new Date(a.check_in).getTime() - new Date(b.check_in).getTime());

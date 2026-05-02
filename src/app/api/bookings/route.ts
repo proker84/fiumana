@@ -12,12 +12,16 @@ export async function GET(req: NextRequest) {
 
   try {
     if (isDashboard) {
-      const totalBookingsResult = await dbQueryOne('SELECT COUNT(*) as count FROM bookings');
+      // Tutti i counter escludono le booking cancellate (cancelled = 1).
+      // Le cancellate restano consultabili solo su /admin/prenotazioni filtro "Cancellate".
+      const totalBookingsResult = await dbQueryOne(
+        'SELECT COUNT(*) as count FROM bookings WHERE COALESCE(cancelled,0) = 0'
+      );
       const totalBookings = Number(totalBookingsResult?.count || 0);
 
       const today = new Date().toISOString().split('T')[0];
       const todayCheckinsResult = await dbQueryOne(
-        'SELECT COUNT(*) as count FROM bookings WHERE check_in = ?',
+        'SELECT COUNT(*) as count FROM bookings WHERE check_in = ? AND COALESCE(cancelled,0) = 0',
         [today]
       );
       const todayCheckins = Number(todayCheckinsResult?.count || 0);
@@ -25,11 +29,12 @@ export async function GET(req: NextRequest) {
       const pendingGuestsResult = await dbQueryOne(`
         SELECT COUNT(*) as count FROM bookings b
         WHERE b.id NOT IN (SELECT DISTINCT booking_id FROM guests)
+          AND COALESCE(b.cancelled,0) = 0
       `);
       const pendingGuests = Number(pendingGuestsResult?.count || 0);
 
       const alloggiatiPendingResult = await dbQueryOne(
-        'SELECT COUNT(*) as count FROM bookings WHERE alloggiati_sent = 0'
+        'SELECT COUNT(*) as count FROM bookings WHERE alloggiati_sent = 0 AND COALESCE(cancelled,0) = 0'
       );
       const alloggiatiPending = Number(alloggiatiPendingResult?.count || 0);
 
