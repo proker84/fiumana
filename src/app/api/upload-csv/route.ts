@@ -166,14 +166,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Marca come cancellate le prenotazioni non presenti nel CSV
+    // Marca come cancellate SOLO le prenotazioni FUTURE non presenti nel CSV.
+    //
+    // Airbnb esporta nel CSV solo i soggiorni futuri o in corso ("Confermata",
+    // "Soggiorno in corso") — esclude le booking concluse e quelle cancellate.
+    // Quindi la mancanza dal CSV è ambigua:
+    //   - check_in >= oggi → realmente cancellata dal cliente
+    //   - check_in <  oggi → semplicemente passata (e quindi non più nel CSV)
+    //
+    // Senza questo filtro le booking storiche (per cui spesso abbiamo già
+    // fatturato e fatto alloggiati) verrebbero marcate come cancellate per
+    // errore. Quindi limitiamo il soft-delete alle sole booking future.
     let cancelledCount = 0;
     if (csvBookingIds.length > 0) {
-      // Costruisce i placeholder per la query IN
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
       const placeholders = csvBookingIds.map(() => '?').join(',');
       const cancelResult = await dbExecute(
-        `UPDATE bookings SET cancelled = 1 WHERE booking_id NOT IN (${placeholders}) AND cancelled = 0`,
-        csvBookingIds
+        `UPDATE bookings
+           SET cancelled = 1
+           WHERE booking_id NOT IN (${placeholders})
+             AND cancelled = 0
+             AND check_in >= ?`,
+        [...csvBookingIds, today]
       );
       cancelledCount = Number(cancelResult.rowsAffected || 0);
     }
