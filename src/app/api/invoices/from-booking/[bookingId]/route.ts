@@ -135,7 +135,20 @@ export async function POST(
       }
     }
 
-    const airbnbCommission = Number((booking as any).airbnb_commission ?? 0);
+    // Commissione Airbnb: la formula della fattura è total_amount + commission.
+    // Se l'admin non l'ha inserita (campo airbnb_commission = 0/null nel DB),
+    // la STIMIAMO al 18% del Guadagni (markup medio Airbnb 2026 in Italia,
+    // calibrato su Yana: 52,70/287,30 ≈ 18,3%). È solo una stima — l'admin
+    // dovrebbe sempre verificare con la fattura passiva Airbnb mensile e
+    // aggiornarla manualmente per avere precisione fiscale.
+    let airbnbCommission = Number((booking as any).airbnb_commission ?? 0);
+    let commissionEstimated = false;
+    if (airbnbCommission === 0 && totalAmount > 0) {
+      const ESTIMATED_COMMISSION_RATE = 0.18; // 18% markup su Guadagni
+      airbnbCommission = Number((totalAmount * ESTIMATED_COMMISSION_RATE).toFixed(2));
+      commissionEstimated = true;
+    }
+
     const aliquotaIva = Number(body.aliquotaIva ?? 10);
 
     const calc = computeBookingInvoice(
@@ -221,6 +234,7 @@ export async function POST(
           totaleFatturaCents: calc.totaleFatturaCents,
           imponibileCents: calc.split.imponibileCents,
           ivaCents: calc.split.ivaCents,
+          commissionEstimated, // true se la commissione era 0 e l'abbiamo stimata 18%
         },
       },
       { status: 201 },

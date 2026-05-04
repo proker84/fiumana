@@ -4,14 +4,17 @@
  * Tutti gli importi sono memorizzati e processati in CENTESIMI (intero),
  * per evitare errori di arrotondamento da floating point.
  *
- * Formula chiave (Fiumana, IVA 10% strutture ricettive):
- *   totale_fattura  = booking.total_amount − city_tax           (lordo IVA)
+ * Formula chiave Fiumana (IVA 10% strutture ricettive, validata mag 2026):
+ *   totale_fattura  = booking.total_amount + airbnb_commission   (lordo IVA)
  *   imponibile      = round(totale_fattura / 1.10, 2 decimali)
  *   iva             = totale_fattura − imponibile
  *
- * Le commissioni Airbnb NON si sottraggono: sono già incluse nel prezzo
- * pagato dall'ospite e quindi nel totale fatturato. Si scaricano lato costi
- * con la fattura passiva ricevuta da Airbnb (reverse charge UE).
+ *   - booking.total_amount = "Guadagni" del CSV Airbnb = NET payout dopo che
+ *     Airbnb ha trattenuto la commissione E remesso la tassa di soggiorno al
+ *     Comune di Comacchio. Va rilanciato sommando la commissione (rifatturata
+ *     al cliente perché era nel prezzo che ha pagato).
+ *   - city_tax NON rientra nel totale: Airbnb l'ha già pagata per nostro
+ *     conto al Comune, non è oggetto del rapporto Fiumana ↔ ospite.
  */
 
 import type { InvoiceItem } from './types';
@@ -119,9 +122,30 @@ export interface BookingCalculation {
 /**
  * Da una prenotazione produce gli importi necessari per pre-compilare la bozza fattura.
  *
+ * Formula corretta (validata commercialista Fiumana, mag 2026):
+ *
+ *   La fattura deve essere AL LORDO delle commissioni Airbnb (rifatturate al
+ *   cliente perché incluse nel prezzo che ha effettivamente pagato), e AL
+ *   NETTO della tassa di soggiorno (Airbnb la remitta direttamente al Comune
+ *   di Comacchio, non rientra nel servizio reso da Fiumana).
+ *
+ *   totaleFattura = total_amount (Guadagni netto host) + airbnb_commission
+ *
+ *   `total_amount` = Guadagni dal CSV Airbnb = NET payout dopo
+ *      (a) commissione Airbnb trattenuta
+ *      (b) tassa di soggiorno già remessa al Comune
+ *
+ *   La city_tax è informazione storica/contabile (la mostriamo sulla riga
+ *   booking) ma NON entra nel totale fattura perché è già stata pagata da
+ *   Airbnb al Comune e non è oggetto del rapporto Fiumana↔ospite.
+ *
  * Esempio Yana Kachura:
- *   computeBookingInvoice({ totalAmount: 344, cityTaxAmount: 4, airbnbCommission: 52.70 }, 10)
- *   → totaleFatturaCents=34000, split={imponibile=30909, iva=3091}
+ *   computeBookingInvoice({ totalAmount: 287.30, airbnbCommission: 52.70, cityTaxAmount: 4 }, 10)
+ *   → totaleFatturaCents=34000 (= 287,30 + 52,70 = 340)
+ *
+ * Esempio Riccardo Lolatto (commissione stimata 17%):
+ *   computeBookingInvoice({ totalAmount: 253.50, airbnbCommission: 42.50, cityTaxAmount: 3 }, 10)
+ *   → totaleFatturaCents=29600 (= 253,50 + 42,50 = 296,00)
  */
 export function computeBookingInvoice(
   booking: BookingForInvoice,
@@ -130,7 +154,7 @@ export function computeBookingInvoice(
   const totaleOspiteCents = eurosToCents(booking.totalAmount);
   const cityTaxCents = eurosToCents(booking.cityTaxAmount ?? 0);
   const airbnbCommissionCents = eurosToCents(booking.airbnbCommission ?? 0);
-  const totaleFatturaCents = Math.max(0, totaleOspiteCents - cityTaxCents);
+  const totaleFatturaCents = Math.max(0, totaleOspiteCents + airbnbCommissionCents);
   const split = splitTotaleLordoIVA(totaleFatturaCents, aliquotaIva);
   return {
     totaleOspiteCents,
