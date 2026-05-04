@@ -588,6 +588,12 @@ function FatturaBadge({ booking }: { booking: Booking }) {
   const stato = booking.invoice_stato_last;
   const numero = booking.invoice_numero_last;
   const id = booking.invoice_id_last;
+
+  // Booking cancellata: niente fattura, niente badge action — solo trattino.
+  if (booking.cancelled && !id) {
+    return <span className="text-xs text-gray-300 italic">—</span>;
+  }
+
   if (!stato || !id) {
     return (
       <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">

@@ -104,6 +104,29 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'Cliente non trovato' }, { status: 400 });
     }
 
+    // Pre-flight validation per evitare HTTP 400 criptici lato Openapi.
+    // Per cliente italiano privato serve CodiceFiscale (16 char) o P.IVA (11 char).
+    // Lo SDI non accetta placeholder (es. "0000000" 7 zeri).
+    if (!customer.isEstero) {
+      const cfLen = (customer.codiceFiscale ?? '').replace(/\s/g, '').length;
+      const pivaLen = (customer.partitaIva ?? '').replace(/\s/g, '').length;
+      const validCf = cfLen === 11 || cfLen === 16;
+      const validPiva = pivaLen === 11;
+      if (!validCf && !validPiva) {
+        await rollbackToBozza(id);
+        return NextResponse.json(
+          {
+            error:
+              `Il cliente "${customer.cognome ?? ''} ${customer.nome ?? customer.ragioneSociale ?? ''}".trim() ` +
+              `non ha un Codice Fiscale (16 char) o P.IVA (11 char) valido. ` +
+              `Aggiornalo dalla pagina cliente in /admin/fatturazione/clienti prima di inviare al SDI.`,
+            customerId: customer.id,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     const settingsRow = await dbQueryOne('SELECT * FROM invoice_settings WHERE id = 1');
     const settings = rowToInvoiceSettings(settingsRow);
     if (!settings) {
