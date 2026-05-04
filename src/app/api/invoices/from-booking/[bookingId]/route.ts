@@ -116,7 +116,25 @@ export async function POST(
     const cityTaxOverride =
       typeof body.cityTaxOverride === 'number' ? body.cityTaxOverride : undefined;
     const cityTaxFromBooking = Number((booking as any).city_tax_amount ?? 0);
-    const cityTax = cityTaxOverride ?? cityTaxFromBooking;
+
+    // Fallback: se la booking non ha tassa di soggiorno salvata (city_tax_amount
+    // = 0 o null), calcoliamo il default automatico così la fattura tiene
+    // sempre conto della city tax.
+    //   Formula Comacchio Lido di Pomposa: 0,50 € × num_guests × min(notti, 14)
+    let cityTax = cityTaxOverride ?? cityTaxFromBooking;
+    if (cityTax === 0 && cityTaxOverride === undefined) {
+      const numGuests = Math.max(1, Number((booking as any).num_guests ?? 1));
+      const checkIn = (booking as any).check_in;
+      const checkOut = (booking as any).check_out;
+      if (checkIn && checkOut) {
+        const ms = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+        const nights = Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24)));
+        const ratePerCents = settings?.tassaSoggiornoDefaultCents ?? 50;
+        const billable = Math.min(14, Math.max(1, nights));
+        cityTax = (numGuests * billable * ratePerCents) / 100; // cents → euro
+      }
+    }
+
     const airbnbCommission = Number((booking as any).airbnb_commission ?? 0);
     const aliquotaIva = Number(body.aliquotaIva ?? 10);
 
