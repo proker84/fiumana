@@ -62,9 +62,9 @@ interface Booking {
   airbnb_commission?: number | null;
 }
 
-// Calcolo default tassa di soggiorno: 2,00 € × num_guests × clamp(notti, 1, 14)
+// Calcolo default tassa di soggiorno: 0,50 € × num_guests × clamp(notti, 1, 14)
 function calcCityTaxDefault(checkIn: string, checkOut: string, numGuests: number): number {
-  const RATE = 2.0; // €/notte/persona — modificabile in futuro da impostazioni
+  const RATE = 0.5; // €/notte/persona — Comacchio Lido di Pomposa
   const MIN_NIGHTS = 1;
   const MAX_NIGHTS = 14;
   if (!checkIn || !checkOut) return RATE * Math.max(numGuests, 1) * MIN_NIGHTS;

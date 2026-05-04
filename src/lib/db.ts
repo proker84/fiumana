@@ -232,8 +232,9 @@ async function initializeDb(db: Client) {
         acube_credit_note_sequence_name TEXT DEFAULT 'FiumanaAIRNC',
         -- conservazione
         conservazione_provider TEXT DEFAULT 'acube',
-        -- default city tax (cents per night per person, override per booking)
-        tassa_soggiorno_default_cents INTEGER DEFAULT 200,
+        -- default city tax: 50 cent (0,50 €) per notte per persona, max 14 notti.
+        -- Override possibile per singola booking dal pannello prenotazione.
+        tassa_soggiorno_default_cents INTEGER DEFAULT 50,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );

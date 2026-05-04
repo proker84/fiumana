@@ -147,18 +147,19 @@ export function computeBookingInvoice(
 
 /**
  * Calcola la tassa di soggiorno stimata in base a: tariffa per notte/persona,
- * numero ospiti, notti, e un cap massimo (es. Ferrara: max 5 notti tassabili).
+ * numero ospiti, notti, e un cap massimo. Comacchio (Lido di Pomposa): max 14
+ * notti tassabili a 0,50 €/notte/persona.
  *
- * @param ratePerNightPerPersonCents tariffa in centesimi (es. 200 = 2,00 €)
+ * @param ratePerNightPerPersonCents tariffa in centesimi (es. 50 = 0,50 €)
  * @param numGuests numero ospiti (default 1)
  * @param nights notti totali del soggiorno
- * @param maxTaxableNights notti massime tassabili (default 5; usa Infinity per nessun limite)
+ * @param maxTaxableNights notti massime tassabili (default 14; usa Infinity per nessun limite)
  */
 export function estimateCityTax(
   ratePerNightPerPersonCents: number,
   numGuests: number,
   nights: number,
-  maxTaxableNights = 5,
+  maxTaxableNights = 14,
 ): number {
   const billableNights = Math.min(Math.max(nights, 0), maxTaxableNights);
   return Math.max(0, billableNights * Math.max(numGuests, 0) * ratePerNightPerPersonCents);

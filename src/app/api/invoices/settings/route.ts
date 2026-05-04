@@ -30,7 +30,7 @@ const FIUMANA_DEFAULTS = {
   acube_numbering_sequence_name: 'FiumanaAIR',
   acube_credit_note_sequence_name: 'FiumanaAIRNC',
   conservazione_provider: 'openapi',
-  tassa_soggiorno_default_cents: 200,
+  tassa_soggiorno_default_cents: 50,
 } as const;
 
 /**

@@ -120,7 +120,7 @@ export function rowToInvoiceSettings(r: any) {
     acubeCreditNoteSequenceUuid: r.acube_credit_note_sequence_uuid ?? null,
     acubeCreditNoteSequenceName: r.acube_credit_note_sequence_name ?? 'FiumanaAIRNC',
     conservazioneProvider: r.conservazione_provider ?? null,
-    tassaSoggiornoDefaultCents: Number(r.tassa_soggiorno_default_cents ?? 200),
+    tassaSoggiornoDefaultCents: Number(r.tassa_soggiorno_default_cents ?? 50),
     createdAt: r.created_at ? new Date(r.created_at) : new Date(),
     updatedAt: r.updated_at ? new Date(r.updated_at) : new Date(),
   };
