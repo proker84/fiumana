@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { renderTemplate, buildBookingVars } from '@/lib/messageTemplate';
 import {
   Search,
   Copy,
@@ -54,10 +55,29 @@ export default function PrenotazioniPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deleteModal, setDeleteModal] = useState<Booking | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [templates, setTemplates] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchBookings();
+    void fetchTemplates();
   }, []);
+
+  async function fetchTemplates() {
+    try {
+      const token = document.cookie.split('; ').find(c => c.startsWith('auth_token='))?.split('=')[1];
+      const res = await fetch('/api/admin/message-templates', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const d = await res.json();
+        const map: Record<string, string> = {};
+        for (const t of d.templates ?? []) map[t.template_key] = t.body;
+        setTemplates(map);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   async function fetchBookings() {
     try {
@@ -83,59 +103,22 @@ export default function PrenotazioniPage() {
     return `/guest/${token}`;
   }
 
-  function getGuestMessage(booking: Booking) {
-    const link = getGuestLink(booking.guest_token);
-    return `Ciao ${booking.guest_name?.split(' ')[0] || ''}!
-
-Grazie per aver prenotato con noi. Per completare il check-in, ti chiediamo di compilare i dati di tutti gli ospiti al seguente link:
-
-${link}
-
-È un obbligo di legge italiano (art. 109 TULPS) comunicare i dati degli ospiti al Portale Alloggiati.
-
-Ti chiediamo di compilare il modulo entro il giorno del check-in. Le istruzioni per il check-in ti saranno inviate il giorno prima del tuo arrivo.
-
-Grazie e buon soggiorno!
-Immobiliare Fiumana`;
-  }
-
-  function formatDateItalian(dateStr: string) {
-    const months = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
-    const date = new Date(dateStr);
-    return `${date.getDate().toString().padStart(2, '0')} ${months[date.getMonth()]}`;
-  }
-
-  function getCheckInInstructions(booking: Booking) {
-    const checkInDate = formatDateItalian(booking.check_in);
-    const firstName = booking.guest_name?.split(' ')[0] || '';
-    return `Buongiorno ${firstName}, ecco le istruzioni per il check-in di domani ${checkInDate}:
-L'appartamento è in via Tofane 4 - Lido di Pomposa, condominio Adriana.
-https://maps.app.goo.gl/nr9mXs4WKy15V4eZ7
-Dovrete inizialmente parcheggiare all'esterno del condominio. I cancelletti pedonali ai lati della struttura sono sempre aperti. L'appartamento è nel settore B - Secondo piano, appartamento 7.
-Quando arrivate davanti alla casa, suonate il videocitofono con in mano i documenti utilizzati nel processo di registrazione e vi comunicheremo direttamente il codice per accedere alla keybox sulla destra del videocitofono.
-Al suo interno troverete le chiavi della suite e del cancello automatico per poter accedere all'interno con la macchina.
-Non c'è un posto assegnato quindi potete parcheggiare dove trovate posto.
-Per quanto riguarda il Wi-Fi, la rete è Suite sul mare Guest e la password: suitesulmare2025
-La signora delle pulizie ha lasciato l'appartamento pronto all'uso con frigorifero attaccato e quadro elettrico acceso.
-Il Comune di Comacchio ha predisposto i cassonetti della spazzatura che si aprono con una tessera che troverete accanto al piano cottura. Vi consigliamo di usare sacchetti piccoli, altrimenti non entrano nell'indifferenziato.
-
-I nostri numeri per qualsiasi esigenza sono:
-+393939011011 Fabio
-+393884885053 David
-Restiamo a disposizione per qualsiasi informazione o chiarimento.
-Un caro saluto e a presto!
-Fabio & David`;
+  function buildVars(booking: Booking) {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    return buildBookingVars(booking, origin);
   }
 
   async function copyInstructions(booking: Booking) {
-    const message = getCheckInInstructions(booking);
+    const tpl = templates['check_in_instructions'] ?? '';
+    const message = renderTemplate(tpl, buildVars(booking));
     await navigator.clipboard.writeText(message);
     setCopiedId('instructions-' + booking.guest_token);
     setTimeout(() => setCopiedId(null), 2000);
   }
 
   async function copyLink(booking: Booking) {
-    const message = getGuestMessage(booking);
+    const tpl = templates['guest_registration'] ?? '';
+    const message = renderTemplate(tpl, buildVars(booking));
     await navigator.clipboard.writeText(message);
     setCopiedId(booking.guest_token);
     setTimeout(() => setCopiedId(null), 2000);

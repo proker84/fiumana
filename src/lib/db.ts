@@ -364,6 +364,72 @@ async function initializeDb(db: Client) {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_sdi_logs_invoice ON invoice_sdi_logs(invoice_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_sdi_logs_event ON invoice_sdi_logs(event_type)');
 
+    // Tabella message_templates: testi customizzabili dall'admin per messaggi
+    // copiati negli appunti e inviati ai clienti via WhatsApp/email/etc.
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS message_templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        template_key TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        description TEXT,
+        body TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Seed iniziale dei template solo se la tabella è vuota — così le modifiche
+    // dell'admin non vengono sovrascritte ad ogni cold-start.
+    const tplCount = await db.execute('SELECT COUNT(*) AS c FROM message_templates');
+    if (Number((tplCount.rows[0] as any).c) === 0) {
+      await db.execute({
+        sql: `INSERT INTO message_templates (template_key, name, description, body) VALUES (?, ?, ?, ?)`,
+        args: [
+          'guest_registration',
+          'Messaggio di registrazione ospiti',
+          'Inviato all\'ospite dopo la prenotazione con il link al form Alloggiati. Variabili: {{firstName}}, {{guestName}}, {{guestLink}}, {{checkInDate}}, {{checkOutDate}}.',
+          `Ciao {{firstName}}!
+
+Grazie per aver prenotato con noi. Per completare il check-in, ti chiediamo di compilare i dati di tutti gli ospiti al seguente link:
+
+{{guestLink}}
+
+È un obbligo di legge italiano (art. 109 TULPS) comunicare i dati degli ospiti al Portale Alloggiati.
+
+Ti chiediamo di compilare il modulo entro il giorno del check-in. Le istruzioni per il check-in ti saranno inviate il giorno prima del tuo arrivo.
+
+Grazie e buon soggiorno!
+Immobiliare Fiumana`,
+        ],
+      });
+
+      await db.execute({
+        sql: `INSERT INTO message_templates (template_key, name, description, body) VALUES (?, ?, ?, ?)`,
+        args: [
+          'check_in_instructions',
+          'Istruzioni di check-in',
+          'Inviato il giorno prima del check-in con accesso, parcheggio, wifi. Variabili: {{firstName}}, {{checkInDate}}.',
+          `Buongiorno {{firstName}}, ecco le istruzioni per il check-in di domani {{checkInDate}}:
+L'appartamento è in via Tofane 4 - Lido di Pomposa, condominio Adriana.
+https://maps.app.goo.gl/nr9mXs4WKy15V4eZ7
+Dovrete inizialmente parcheggiare all'esterno del condominio. I cancelletti pedonali ai lati della struttura sono sempre aperti. L'appartamento è nel settore B - Secondo piano, appartamento 7.
+Quando arrivate davanti alla casa, suonate il videocitofono con in mano i documenti utilizzati nel processo di registrazione e vi comunicheremo direttamente il codice per accedere alla keybox sulla destra del videocitofono.
+Al suo interno troverete le chiavi della suite e del cancello automatico per poter accedere all'interno con la macchina.
+Non c'è un posto assegnato quindi potete parcheggiare dove trovate posto.
+Per quanto riguarda il Wi-Fi, la rete è Suite sul mare Guest e la password: suitesulmare2025
+La signora delle pulizie ha lasciato l'appartamento pronto all'uso con frigorifero attaccato e quadro elettrico acceso.
+Il Comune di Comacchio ha predisposto i cassonetti della spazzatura che si aprono con una tessera che troverete accanto al piano cottura. Vi consigliamo di usare sacchetti piccoli, altrimenti non entrano nell'indifferenziato.
+
+I nostri numeri per qualsiasi esigenza sono:
++393939011011 Fabio
++393884885053 David
+Restiamo a disposizione per qualsiasi informazione o chiarimento.
+Un caro saluto e a presto!
+Fabio & David`,
+        ],
+      });
+    }
+
     // Migration additiva su `bookings`: aggiunge city_tax_amount, airbnb_commission e cancelled se mancanti.
     // SQLite/Turso non supporta "ALTER TABLE ADD COLUMN IF NOT EXISTS", quindi ispezioniamo PRAGMA table_info.
     try {

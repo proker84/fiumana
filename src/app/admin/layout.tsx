@@ -17,6 +17,7 @@ import {
   MessageSquare,
   Brush,
   Receipt,
+  Mail,
 } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -69,6 +70,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/pulizie', icon: Brush, label: 'Pulizie' },
     { href: '/admin/fatturazione', icon: Receipt, label: 'Fatturazione' },
     { href: '/admin/richieste', icon: MessageSquare, label: 'Richieste' },
+    { href: '/admin/impostazioni/messaggi', icon: Mail, label: 'Messaggi' },
     { href: '/admin/import-csv', icon: Upload, label: 'Importa CSV' },
     { href: '/admin/impostazioni', icon: Settings, label: 'Impostazioni' },
   ];
