@@ -158,13 +158,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // e poi passarli al payload-builder. Skippa per fatture già numerate
     // (es. retry di un invio fallito) per evitare buchi nella sequenza.
     //
-    // Numerazione separata per TD01 (fatture) e TD04 (note di credito): la
-    // legge italiana lo permette se ogni serie è progressiva al suo interno.
-    // Distinguiamo via sezionale ('AIR' fatture, 'AIR-NC' note credito) così
-    // la query MAX(numero) le considera spazi numerici separati.
-    //
-    //   - TD01 sezionale='AIR'    → numero_completo = "5/2026"
-    //   - TD04 sezionale='AIR-NC' → numero_completo = "NC-1/2026"
+    // Numerazione UNICA E SEQUENZIALE Fiumana (validata commercialista mag 2026):
+    // TD01 (fatture) e TD04 (note di credito) condividono la stessa sezionale
+    // 'AIR' e la stessa progressione numerica. Esempio:
+    //   5/2026 TD01 → 6/2026 TD01 → 7/2026 TD04 → 8/2026 TD01 → ...
     if (lockedInv.numero === null || lockedInv.numeroCompleto === null) {
       const annoFt = new Date(lockedInv.dataDocumento).getFullYear();
       const sezionale = lockedInv.sezionale || '';
@@ -175,10 +172,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         [sezionale, annoFt],
       );
       const nextNumero = Number((lastRow as any)?.max_num ?? 0) + 1;
-      const isCreditNote = lockedInv.tipoDocumento === 'TD04';
-      const numeroCompleto = isCreditNote
-        ? `NC-${nextNumero}/${annoFt}`
-        : `${nextNumero}/${annoFt}`;
+      const numeroCompleto = `${nextNumero}/${annoFt}`;
       await dbExecute(
         `UPDATE invoices
            SET numero = ?, anno = ?, numero_completo = ?, updated_at = CURRENT_TIMESTAMP
