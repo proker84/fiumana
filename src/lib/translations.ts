@@ -103,6 +103,11 @@ export const translations: Record<Language, Record<string, string>> = {
     correctionRequired: 'Correzione Richiesta',
     pleaseCorrect: 'Per favore, correggi i dati indicati e reinvia il modulo.',
     fixErrorsBeforeSubmit: 'Completa tutti i campi obbligatori prima di procedere. I campi mancanti sono evidenziati in rosso.',
+    // Codice fiscale (richiesto solo per cittadini italiani — usato per fatturazione)
+    fiscalCode: 'Codice fiscale',
+    fiscalCodeHelp: 'Necessario per emettere la fattura. Lo trovi sulla tessera sanitaria o carta d\'identità (16 caratteri).',
+    fiscalCodeRequired: 'Codice fiscale obbligatorio per cittadini italiani',
+    fiscalCodeInvalid: 'Codice fiscale non valido (deve essere 16 caratteri alfanumerici)',
   },
 
   en: {

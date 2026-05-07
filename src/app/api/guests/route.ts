@@ -64,6 +64,13 @@ export async function POST(req: NextRequest) {
     // Insert each guest
     for (let i = 0; i < guests.length; i++) {
       const g = guests[i];
+      // Codice fiscale: salviamo solo se ospite italiano (cittadinanza =
+      // codice 100000100). Per stranieri il campo resta NULL.
+      const cf = g.cittadinanza === '100000100'
+        ? (typeof g.codice_fiscale === 'string'
+            ? g.codice_fiscale.replace(/\s/g, '').toUpperCase()
+            : null)
+        : null;
       await dbExecute(
         `INSERT INTO guests (
           booking_id, progressivo, tipo_alloggiato, camere_occupate,
@@ -72,8 +79,9 @@ export async function POST(req: NextRequest) {
           stato_residenza, comune_residenza, comune_residenza_codice, provincia_residenza, indirizzo_residenza,
           tipo_documento, numero_documento, stato_rilascio, comune_rilascio, comune_rilascio_codice, luogo_rilascio,
           documento_fronte, documento_retro,
-          data_arrivo, giorni_permanenza
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          data_arrivo, giorni_permanenza,
+          codice_fiscale
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           booking.id,
           i + 1, // progressivo
@@ -103,6 +111,7 @@ export async function POST(req: NextRequest) {
           g.documento_retro || null,
           booking.check_in,
           giorniPermanenza,
+          cf,
         ]
       );
     }

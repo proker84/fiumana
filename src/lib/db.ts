@@ -378,17 +378,16 @@ async function initializeDb(db: Client) {
       )
     `);
 
-    // Seed iniziale dei template solo se la tabella è vuota — così le modifiche
-    // dell'admin non vengono sovrascritte ad ogni cold-start.
-    const tplCount = await db.execute('SELECT COUNT(*) AS c FROM message_templates');
-    if (Number((tplCount.rows[0] as any).c) === 0) {
-      await db.execute({
-        sql: `INSERT INTO message_templates (template_key, name, description, body) VALUES (?, ?, ?, ?)`,
-        args: [
-          'guest_registration',
-          'Messaggio di registrazione ospiti',
-          'Inviato all\'ospite dopo la prenotazione con il link al form Alloggiati. Variabili: {{firstName}}, {{guestName}}, {{guestLink}}, {{checkInDate}}, {{checkOutDate}}.',
-          `Ciao {{firstName}}!
+    // Seed dei template (INSERT OR IGNORE per chiave): aggiunge i nuovi
+    // template ai cold-start successivi senza sovrascrivere quelli esistenti
+    // già modificati dall'admin. Viene saltato il record se template_key
+    // esiste già (vincolo UNIQUE sulla colonna).
+    const seedTemplates: Array<{ key: string; name: string; description: string; body: string }> = [
+      {
+        key: 'guest_registration',
+        name: 'Messaggio di registrazione ospiti',
+        description: 'Inviato all\'ospite dopo la prenotazione con il link al form Alloggiati. Variabili: {{firstName}}, {{guestName}}, {{guestLink}}, {{checkInDate}}, {{checkOutDate}}.',
+        body: `Ciao {{firstName}}!
 
 Grazie per aver prenotato con noi. Per completare il check-in, ti chiediamo di compilare i dati di tutti gli ospiti al seguente link:
 
@@ -400,16 +399,12 @@ Ti chiediamo di compilare il modulo entro il giorno del check-in. Le istruzioni 
 
 Grazie e buon soggiorno!
 Immobiliare Fiumana`,
-        ],
-      });
-
-      await db.execute({
-        sql: `INSERT INTO message_templates (template_key, name, description, body) VALUES (?, ?, ?, ?)`,
-        args: [
-          'check_in_instructions',
-          'Istruzioni di check-in',
-          'Inviato il giorno prima del check-in con accesso, parcheggio, wifi. Variabili: {{firstName}}, {{checkInDate}}.',
-          `Buongiorno {{firstName}}, ecco le istruzioni per il check-in di domani {{checkInDate}}:
+      },
+      {
+        key: 'check_in_instructions',
+        name: 'Istruzioni di check-in',
+        description: 'Inviato il giorno prima del check-in con accesso, parcheggio, wifi. Variabili: {{firstName}}, {{checkInDate}}.',
+        body: `Buongiorno {{firstName}}, ecco le istruzioni per il check-in di domani {{checkInDate}}:
 L'appartamento è in via Tofane 4 - Lido di Pomposa, condominio Adriana.
 https://maps.app.goo.gl/nr9mXs4WKy15V4eZ7
 Dovrete inizialmente parcheggiare all'esterno del condominio. I cancelletti pedonali ai lati della struttura sono sempre aperti. L'appartamento è nel settore B - Secondo piano, appartamento 7.
@@ -426,8 +421,61 @@ I nostri numeri per qualsiasi esigenza sono:
 Restiamo a disposizione per qualsiasi informazione o chiarimento.
 Un caro saluto e a presto!
 Fabio & David`,
-        ],
+      },
+      {
+        key: 'mid_stay_check',
+        name: 'Verifica metà soggiorno',
+        description: 'Da inviare a metà soggiorno per verificare che l\'ospite stia bene. Variabili: {{firstName}}.',
+        body: `Buongiorno {{firstName}},
+volevamo solo assicurarci che tutto stia procedendo per il meglio nell'appartamento e che vi stiate trovando bene.
+
+Se avete qualsiasi necessità, dubbio o c'è qualcosa che non funziona come dovrebbe, non esitate a scriverci o chiamarci — siamo qui per aiutarvi.
+
+Vi auguriamo di continuare a godervi il vostro soggiorno!
+
+Un caro saluto,
+Fabio & David
++393939011011 / +393884885053`,
+      },
+      {
+        key: 'check_out_reminder',
+        name: 'Promemoria check-out',
+        description: 'Da inviare il giorno prima del check-out con istruzioni di uscita. Variabili: {{firstName}}, {{checkOutDate}}.',
+        body: `Buongiorno {{firstName}},
+vi ricordiamo che il check-out è previsto per domani {{checkOutDate}} entro le ore 10:00.
+
+Per la riconsegna delle chiavi:
+1. Riposizionate le chiavi all'interno della smart lock — il codice è 0902.
+2. Chiudete il keybox e fate ruotare le rondelline per rimuovere il codice (così resta sicuro per il prossimo ospite).
+3. Mi raccomando: parcheggiate la macchina FUORI dai cancelli del condominio PRIMA di riconsegnare le chiavi (una volta consegnate non avrete più modo di aprire il cancello automatico).
+
+Se avete bisogno di un check-out posticipato fatecelo sapere il prima possibile, compatibilmente con il prossimo ospite vediamo cosa possiamo fare.
+
+Grazie per aver scelto Immobiliare Fiumana, ci auguriamo di rivedervi presto!
+
+Un caro saluto,
+Fabio & David
++393939011011 / +393884885053`,
+      },
+    ];
+
+    for (const t of seedTemplates) {
+      await db.execute({
+        sql: `INSERT OR IGNORE INTO message_templates (template_key, name, description, body) VALUES (?, ?, ?, ?)`,
+        args: [t.key, t.name, t.description, t.body],
       });
+    }
+
+    // Migration additiva su `guests`: aggiunge codice_fiscale (richiesto solo
+    // per ospiti italiani, usato per fatturazione SDI).
+    try {
+      const cols = await db.execute('PRAGMA table_info(guests)');
+      const colNames = new Set(cols.rows.map((r: any) => String(r.name)));
+      if (!colNames.has('codice_fiscale')) {
+        await db.execute('ALTER TABLE guests ADD COLUMN codice_fiscale TEXT');
+      }
+    } catch (e) {
+      console.error('Migration guests.codice_fiscale failed:', e);
     }
 
     // Migration additiva su `bookings`: aggiunge city_tax_amount, airbnb_commission e cancelled se mancanti.

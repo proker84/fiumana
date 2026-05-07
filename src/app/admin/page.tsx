@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { renderTemplate, buildBookingVars } from '@/lib/messageTemplate';
+import { MessageDropdown } from '@/components/admin/MessageDropdown';
 import {
   CalendarDays,
   Users,
@@ -51,8 +51,7 @@ interface DashboardData {
 export default function AdminDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [templates, setTemplates] = useState<Record<string, string>>({});
+  const [templates, setTemplates] = useState<Array<{ template_key: string; name: string; body: string }>>([]);
 
   useEffect(() => {
     fetchDashboard();
@@ -67,9 +66,7 @@ export default function AdminDashboard() {
       });
       if (res.ok) {
         const d = await res.json();
-        const map: Record<string, string> = {};
-        for (const t of d.templates ?? []) map[t.template_key] = t.body;
-        setTemplates(map);
+        setTemplates(d.templates ?? []);
       }
     } catch (err) {
       console.error(err);
@@ -81,27 +78,6 @@ export default function AdminDashboard() {
       return `${window.location.origin}/guest/${token}`;
     }
     return `/guest/${token}`;
-  }
-
-  function buildVars(booking: Booking) {
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    return buildBookingVars(booking, origin);
-  }
-
-  async function copyInstructions(booking: Booking) {
-    const tpl = templates['check_in_instructions'] ?? '';
-    const message = renderTemplate(tpl, buildVars(booking));
-    await navigator.clipboard.writeText(message);
-    setCopiedId('instructions-' + booking.guest_token);
-    setTimeout(() => setCopiedId(null), 2000);
-  }
-
-  async function copyLink(token: string, booking: Booking) {
-    const tpl = templates['guest_registration'] ?? '';
-    const message = renderTemplate(tpl, buildVars(booking));
-    await navigator.clipboard.writeText(message);
-    setCopiedId(token);
-    setTimeout(() => setCopiedId(null), 2000);
   }
 
   // Trova la prossima prenotazione imminente, poi ordina le altre con
@@ -250,38 +226,7 @@ export default function AdminDashboard() {
                     <Clock className="w-3.5 h-3.5" /> Da inviare
                   </span>
                 )}
-                <button
-                  onClick={() => copyLink(nextBooking.guest_token, nextBooking)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-white border border-primary-300 text-primary-700 rounded-lg text-xs font-medium hover:bg-primary-50 transition-colors"
-                >
-                  {copiedId === nextBooking.guest_token ? (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Copiato!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      Copia Messaggio
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => copyInstructions(nextBooking)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-white border border-green-300 text-green-700 rounded-lg text-xs font-medium hover:bg-green-50 transition-colors"
-                >
-                  {copiedId === 'instructions-' + nextBooking.guest_token ? (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Copiato!
-                    </>
-                  ) : (
-                    <>
-                      <MapPin className="w-3.5 h-3.5" />
-                      Copia Istruzioni
-                    </>
-                  )}
-                </button>
+                <MessageDropdown booking={nextBooking} templates={templates} />
                 <Link
                   href={`/admin/prenotazioni/${nextBooking.id}`}
                   className="px-4 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700 transition-colors"
@@ -355,28 +300,7 @@ export default function AdminDashboard() {
                     </td>
                     <td className="py-3">
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => copyLink(b.guest_token, b)}
-                          className="p-1.5 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors"
-                          title="Copia messaggio registrazione"
-                        >
-                          {copiedId === b.guest_token ? (
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => copyInstructions(b)}
-                          className="p-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
-                          title="Copia istruzioni check-in"
-                        >
-                          {copiedId === 'instructions-' + b.guest_token ? (
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                          ) : (
-                            <MapPin className="w-3.5 h-3.5" />
-                          )}
-                        </button>
+                        <MessageDropdown booking={b} templates={templates} compact />
                         <a
                           href={getGuestLink(b.guest_token)}
                           target="_blank"

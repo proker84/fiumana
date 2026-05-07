@@ -83,15 +83,21 @@ export async function POST(
         (booking as any).guest_email,
       );
       const isEstero = customerInput.nazione !== 'IT';
+      // Codice fiscale: prendiamolo dal guest form se l'ospite italiano l'ha
+      // compilato. Per esteri lasciamo NULL (la fattura usa IdFiscaleIVA).
+      const guestCf = mainGuest.codice_fiscale
+        ? String(mainGuest.codice_fiscale).replace(/\s/g, '').toUpperCase()
+        : null;
       const insert = await dbExecute(
         `INSERT INTO customers (
-           tipo, cognome, nome, nazione, indirizzo, cap, comune, provincia, email,
+           tipo, cognome, nome, codice_fiscale, nazione, indirizzo, cap, comune, provincia, email,
            codice_destinatario, is_estero, source_guest_id
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           customerInput.tipo ?? 'PF',
           customerInput.cognome ?? null,
           customerInput.nome ?? null,
+          guestCf,
           customerInput.nazione,
           customerInput.indirizzo ?? null,
           customerInput.cap ?? null,

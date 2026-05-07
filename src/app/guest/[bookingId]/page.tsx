@@ -50,6 +50,8 @@ interface GuestForm {
   luogo_rilascio: string;
   documento_fronte: string;
   documento_retro: string;
+  // Codice fiscale (richiesto solo per ospiti italiani — usato in fatturazione)
+  codice_fiscale: string;
   isOpen: boolean;
 }
 
@@ -90,6 +92,7 @@ const emptyGuest = (): GuestForm => ({
   luogo_rilascio: '',
   documento_fronte: '',
   documento_retro: '',
+  codice_fiscale: '',
   isOpen: true,
 });
 
@@ -207,6 +210,19 @@ export default function GuestPage() {
         guestErrors.push(t('cityOfResidenceRequired') || 'Comune residenza richiesto');
       }
       if (!g.indirizzo_residenza.trim()) guestErrors.push(t('addressRequired') || 'Indirizzo richiesto');
+
+      // Codice fiscale: obbligatorio solo per ospiti italiani (cittadinanza
+      // italiana = codice 100000100). Serve per la fatturazione SDI.
+      if (g.cittadinanza === '100000100') {
+        const cf = g.codice_fiscale.replace(/\s/g, '').toUpperCase();
+        if (!cf) {
+          guestErrors.push(t('fiscalCodeRequired') || 'Codice fiscale richiesto per cittadini italiani');
+        } else if (cf.length !== 16) {
+          guestErrors.push(t('fiscalCodeInvalid') || 'Codice fiscale non valido (16 caratteri)');
+        } else if (!/^[A-Z0-9]{16}$/.test(cf)) {
+          guestErrors.push(t('fiscalCodeInvalid') || 'Codice fiscale non valido (16 caratteri)');
+        }
+      }
 
       // Documento
       if (!g.stato_rilascio) guestErrors.push(t('countryOfIssueRequired') || 'Stato rilascio richiesto');
@@ -679,6 +695,33 @@ export default function GuestPage() {
                       />
                     </div>
                   </div>
+
+                  {/* Codice Fiscale: solo cittadinanza italiana (per fatturazione SDI) */}
+                  {guest.cittadinanza === '100000100' && (
+                    <div className="pt-3 border-t border-gray-100">
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                        {t('fiscalCode') || 'Codice fiscale'} *
+                      </label>
+                      <input
+                        type="text"
+                        value={guest.codice_fiscale}
+                        onChange={(e) =>
+                          updateGuest(
+                            guest.id,
+                            'codice_fiscale',
+                            e.target.value.toUpperCase().replace(/\s/g, ''),
+                          )
+                        }
+                        maxLength={16}
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm font-mono uppercase"
+                        placeholder="RSSMRA85M01H501Z"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        {t('fiscalCodeHelp') ||
+                          'Necessario per emettere la fattura. Lo trovi sulla tessera sanitaria o carta d\'identità (16 caratteri).'}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Document Info */}
                   <div className="pt-3 border-t border-gray-100">
