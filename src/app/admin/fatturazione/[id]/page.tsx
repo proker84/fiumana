@@ -216,12 +216,16 @@ export default function InvoiceDetailPage() {
   const [sending, setSending] = useState(false);
   const [polling, setPolling] = useState(false);
 
-  // Editing inline della bozza (descrizione + prezzo riga, aliquota IVA)
+  // Editing inline della bozza (descrizione + prezzo riga, aliquota IVA + info booking)
   const [editingDraft, setEditingDraft] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [editItems, setEditItems] = useState<
     Array<{ rigaNumero: number; descrizione: string; prezzoEur: string; aliquotaIva: string }>
   >([]);
+  // Info booking modificabili (totale ospite, city tax, commissione Airbnb)
+  const [editBookingTotal, setEditBookingTotal] = useState<string>('');
+  const [editCityTax, setEditCityTax] = useState<string>('');
+  const [editAirbnbCommission, setEditAirbnbCommission] = useState<string>('');
 
   useEffect(() => {
     void load();
@@ -253,6 +257,17 @@ export default function InvoiceDetailPage() {
         prezzoEur: (it.imponibileCents / 100).toFixed(2),
         aliquotaIva: it.aliquotaIva.toFixed(2),
       })),
+    );
+    setEditBookingTotal(
+      invoice.bookingTotalCents != null ? (invoice.bookingTotalCents / 100).toFixed(2) : '',
+    );
+    setEditCityTax(
+      invoice.cityTaxCents != null ? (invoice.cityTaxCents / 100).toFixed(2) : '',
+    );
+    setEditAirbnbCommission(
+      invoice.airbnbCommissionCents != null
+        ? (invoice.airbnbCommissionCents / 100).toFixed(2)
+        : '',
     );
     setEditingDraft(true);
   }
@@ -289,13 +304,23 @@ export default function InvoiceDetailPage() {
       const sumTot = items.reduce((s, x) => s + x.totaleCents, 0);
       const aliquotaInv = items[0]?.aliquotaIva ?? invoice.aliquotaIva;
 
-      const body = {
+      const body: any = {
         items,
         imponibileCents: sumImp,
         ivaCents: sumIva,
         totaleCents: sumTot,
         aliquotaIva: aliquotaInv,
       };
+      // Info booking modificabili (NON entrano nel totale fattura, solo metadata)
+      if (editBookingTotal.trim() !== '') {
+        body.bookingTotalCents = Math.round(Number(editBookingTotal) * 100);
+      }
+      if (editCityTax.trim() !== '') {
+        body.cityTaxCents = Math.round(Number(editCityTax) * 100);
+      }
+      if (editAirbnbCommission.trim() !== '') {
+        body.airbnbCommissionCents = Math.round(Number(editAirbnbCommission) * 100);
+      }
 
       await apiFetch(`/api/invoices/${id}`, {
         method: 'PATCH',
@@ -750,26 +775,70 @@ export default function InvoiceDetailPage() {
                   }
                 />
               </div>
-              {invoice.bookingTotalCents != null && (
-                <div className="border-t border-gray-100 pt-2 mt-2 text-xs text-gray-500 space-y-1">
-                  <Row
-                    label="Totale ospite (booking)"
-                    value={fmtMoney(invoice.bookingTotalCents)}
-                  />
-                  {invoice.cityTaxCents != null && invoice.cityTaxCents > 0 && (
-                    <Row
-                      label="Tasse soggiorno (escluse)"
-                      value={`-${fmtMoney(invoice.cityTaxCents)}`}
+              {editingDraft ? (
+                <div className="border-t border-gray-100 pt-3 mt-2 space-y-2 text-xs">
+                  <p className="text-gray-500 font-medium">
+                    Info booking (solo metadata, NON entrano nel totale fattura)
+                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-gray-500">Totale ospite (booking)</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editBookingTotal}
+                      onChange={(e) => setEditBookingTotal(e.target.value)}
+                      placeholder="0.00"
+                      className="w-28 px-2 py-1 rounded border border-gray-200 text-right font-mono focus:border-primary-500 outline-none"
                     />
-                  )}
-                  {invoice.airbnbCommissionCents != null &&
-                    invoice.airbnbCommissionCents > 0 && (
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-gray-500">Tasse soggiorno (escluse)</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editCityTax}
+                      onChange={(e) => setEditCityTax(e.target.value)}
+                      placeholder="0.00"
+                      className="w-28 px-2 py-1 rounded border border-gray-200 text-right font-mono focus:border-primary-500 outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-gray-500">Commissione Airbnb (info)</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editAirbnbCommission}
+                      onChange={(e) => setEditAirbnbCommission(e.target.value)}
+                      placeholder="0.00"
+                      className="w-28 px-2 py-1 rounded border border-gray-200 text-right font-mono focus:border-primary-500 outline-none"
+                    />
+                  </div>
+                </div>
+              ) : (
+                invoice.bookingTotalCents != null && (
+                  <div className="border-t border-gray-100 pt-2 mt-2 text-xs text-gray-500 space-y-1">
+                    <Row
+                      label="Totale ospite (booking)"
+                      value={fmtMoney(invoice.bookingTotalCents)}
+                    />
+                    {invoice.cityTaxCents != null && invoice.cityTaxCents > 0 && (
                       <Row
-                        label="Commissione Airbnb (info)"
-                        value={fmtMoney(invoice.airbnbCommissionCents)}
+                        label="Tasse soggiorno (escluse)"
+                        value={`-${fmtMoney(invoice.cityTaxCents)}`}
                       />
                     )}
-                </div>
+                    {invoice.airbnbCommissionCents != null &&
+                      invoice.airbnbCommissionCents > 0 && (
+                        <Row
+                          label="Commissione Airbnb (info)"
+                          value={fmtMoney(invoice.airbnbCommissionCents)}
+                        />
+                      )}
+                  </div>
+                )
               )}
             </dl>
           </div>
