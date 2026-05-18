@@ -60,6 +60,7 @@ interface Booking {
   total_amount?: number | null;
   city_tax_amount?: number | null;
   airbnb_commission?: number | null;
+  airbnb_invoice_ref?: string | null;
 }
 
 // Calcolo default tassa di soggiorno: 0,50 € × num_guests × clamp(notti, 1, 14)
@@ -172,6 +173,15 @@ export default function BookingDetailPage() {
   const [airbnbCommissionInput, setAirbnbCommissionInput] = useState<string>('');
   const [savingTax, setSavingTax] = useState(false);
   const [taxMessage, setTaxMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Editing dati prenotazione (date, totale Airbnb, riferimento fattura passiva)
+  const [editingBooking, setEditingBooking] = useState(false);
+  const [checkInInput, setCheckInInput] = useState<string>('');
+  const [checkOutInput, setCheckOutInput] = useState<string>('');
+  const [totalAmountInput, setTotalAmountInput] = useState<string>('');
+  const [airbnbInvoiceRefInput, setAirbnbInvoiceRefInput] = useState<string>('');
+  const [savingBooking, setSavingBooking] = useState(false);
+  const [bookingMessage, setBookingMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [receiptForm, setReceiptForm] = useState({
     receipt_id: '',
     send_date: '',
@@ -209,6 +219,15 @@ export default function BookingDetailPage() {
             ? Number(data.booking.airbnb_commission).toFixed(2)
             : ''
         );
+        // Pre-popola i campi editing booking
+        setCheckInInput(data.booking.check_in ?? '');
+        setCheckOutInput(data.booking.check_out ?? '');
+        setTotalAmountInput(
+          data.booking.total_amount != null
+            ? Number(data.booking.total_amount).toFixed(2)
+            : '',
+        );
+        setAirbnbInvoiceRefInput(data.booking.airbnb_invoice_ref ?? '');
       }
     } catch (err) {
       console.error(err);
@@ -246,6 +265,40 @@ export default function BookingDetailPage() {
       setTaxMessage({ type: 'error', text: err.message ?? 'Errore di connessione' });
     } finally {
       setSavingTax(false);
+    }
+  }
+
+  // Salva date check-in/check-out, totale Airbnb, riferimento fattura passiva
+  async function saveBookingFields() {
+    setSavingBooking(true);
+    setBookingMessage(null);
+    try {
+      const token = document.cookie.split('; ').find(c => c.startsWith('auth_token='))?.split('=')[1];
+      const body: any = {};
+      if (checkInInput && /^\d{4}-\d{2}-\d{2}$/.test(checkInInput)) body.check_in = checkInInput;
+      if (checkOutInput && /^\d{4}-\d{2}-\d{2}$/.test(checkOutInput)) body.check_out = checkOutInput;
+      if (totalAmountInput.trim() !== '') body.total_amount = Number(totalAmountInput);
+      // airbnb_invoice_ref: accetta anche stringa vuota (per cancellare il valore)
+      body.airbnb_invoice_ref = airbnbInvoiceRefInput.trim();
+
+      const res = await fetch(`/api/bookings/${bookingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setBooking(data.booking);
+        setBookingMessage({ type: 'success', text: 'Dati prenotazione aggiornati.' });
+        setEditingBooking(false);
+        setTimeout(() => setBookingMessage(null), 2500);
+      } else {
+        setBookingMessage({ type: 'error', text: data.error ?? 'Errore' });
+      }
+    } catch (err: any) {
+      setBookingMessage({ type: 'error', text: err.message ?? 'Errore di connessione' });
+    } finally {
+      setSavingBooking(false);
     }
   }
 
@@ -567,6 +620,150 @@ export default function BookingDetailPage() {
                 </>
               )}
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Modifica dati prenotazione (date, totale Airbnb, fattura passiva) */}
+      <div className="admin-card mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-primary-500" />
+            Dati prenotazione
+          </h2>
+          {!editingBooking ? (
+            <button
+              onClick={() => setEditingBooking(true)}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-medium"
+            >
+              Modifica
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setEditingBooking(false);
+                  setBookingMessage(null);
+                  // reset ai valori del DB
+                  setCheckInInput(booking.check_in ?? '');
+                  setCheckOutInput(booking.check_out ?? '');
+                  setTotalAmountInput(
+                    booking.total_amount != null ? Number(booking.total_amount).toFixed(2) : '',
+                  );
+                  setAirbnbInvoiceRefInput(booking.airbnb_invoice_ref ?? '');
+                }}
+                className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-medium"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={saveBookingFields}
+                disabled={savingBooking}
+                className="px-4 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 disabled:opacity-50"
+              >
+                {savingBooking ? 'Salvataggio…' : 'Salva'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {bookingMessage && (
+          <div
+            className={`rounded-lg p-3 mb-4 text-sm flex items-center gap-2 ${
+              bookingMessage.type === 'success'
+                ? 'bg-green-50 text-green-700 border border-green-200'
+                : 'bg-red-50 text-red-700 border border-red-200'
+            }`}
+          >
+            {bookingMessage.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4" />
+            ) : (
+              <AlertTriangle className="w-4 h-4" />
+            )}
+            {bookingMessage.text}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+              Check-in
+            </label>
+            {editingBooking ? (
+              <input
+                type="date"
+                value={checkInInput}
+                onChange={(e) => setCheckInInput(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+              />
+            ) : (
+              <p className="text-gray-900">{formatDateIT(booking.check_in)}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+              Check-out
+            </label>
+            {editingBooking ? (
+              <input
+                type="date"
+                value={checkOutInput}
+                onChange={(e) => setCheckOutInput(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+              />
+            ) : (
+              <p className="text-gray-900">{formatDateIT(booking.check_out)}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+              Totale Airbnb (Guadagni netto host) €
+            </label>
+            {editingBooking ? (
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={totalAmountInput}
+                onChange={(e) => setTotalAmountInput(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm font-mono focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                placeholder="287.30"
+              />
+            ) : (
+              <p className="text-gray-900 font-mono">
+                {booking.total_amount != null
+                  ? Number(booking.total_amount).toFixed(2) + ' €'
+                  : '—'}
+              </p>
+            )}
+            <p className="text-xs text-gray-400 mt-1">
+              Importo che ti arriva da Airbnb dopo trattenute (campo "Guadagni" del CSV). Da
+              aggiornare se Airbnb ricalcola dopo un rimborso per check-out anticipato.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+              Riferimento fattura passiva Airbnb
+            </label>
+            {editingBooking ? (
+              <input
+                type="text"
+                value={airbnbInvoiceRefInput}
+                onChange={(e) => setAirbnbInvoiceRefInput(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                placeholder="es. Fattura Airbnb #ABC123 del 15/05/2026, commissione 52,70 €"
+              />
+            ) : (
+              <p className="text-gray-700 text-sm">
+                {booking.airbnb_invoice_ref || (
+                  <span className="text-gray-400 italic">non ancora inserito</span>
+                )}
+              </p>
+            )}
+            <p className="text-xs text-gray-400 mt-1">
+              Riferimento testuale alla fattura passiva ricevuta da Airbnb (numero, data,
+              commissione). Solo informativo per riconciliazione contabile col commercialista.
+            </p>
           </div>
         </div>
       </div>

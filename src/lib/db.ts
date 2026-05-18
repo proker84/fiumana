@@ -493,6 +493,11 @@ Fabio & David
       if (!colNames.has('cancelled')) {
         await db.execute('ALTER TABLE bookings ADD COLUMN cancelled INTEGER DEFAULT 0');
       }
+      // Riferimento alla fattura passiva Airbnb (commissione) — testo libero
+      // così l'admin può incollare il numero fattura/data/PEC ricevuti da Airbnb.
+      if (!colNames.has('airbnb_invoice_ref')) {
+        await db.execute('ALTER TABLE bookings ADD COLUMN airbnb_invoice_ref TEXT');
+      }
     } catch (e) {
       console.error('Migration bookings columns failed:', e);
     }

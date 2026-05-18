@@ -37,8 +37,12 @@ export async function GET(
 /**
  * PATCH /api/bookings/[id]
  * Aggiorna alcuni campi della prenotazione utili per la fatturazione:
- *   - city_tax_amount: tassa di soggiorno totale (in euro) — verrà sottratta dal totale fattura
- *   - airbnb_commission: commissione trattenuta da Airbnb (in euro) — info per riconciliazione
+ *   - city_tax_amount: tassa di soggiorno totale (in euro)
+ *   - airbnb_commission: commissione trattenuta da Airbnb (in euro)
+ *   - total_amount: payout netto Airbnb (Guadagni) — da aggiornare se Airbnb
+ *     ricalcola dopo rimborsi per check-out anticipato
+ *   - check_in / check_out: date effettive (se l'ospite parte prima)
+ *   - airbnb_invoice_ref: riferimento alla fattura passiva Airbnb (testo libero)
  *   - notes
  */
 export async function PATCH(
@@ -55,6 +59,10 @@ export async function PATCH(
     const allowed: Record<string, string> = {
       city_tax_amount: 'city_tax_amount',
       airbnb_commission: 'airbnb_commission',
+      total_amount: 'total_amount',
+      check_in: 'check_in',
+      check_out: 'check_out',
+      airbnb_invoice_ref: 'airbnb_invoice_ref',
       notes: 'notes',
     };
 
@@ -64,9 +72,20 @@ export async function PATCH(
       if (key in body) {
         sets.push(`${col} = ?`);
         let v = body[key];
-        if (key === 'city_tax_amount' || key === 'airbnb_commission') {
+        if (key === 'city_tax_amount' || key === 'airbnb_commission' || key === 'total_amount') {
           v = Number(v);
           if (!Number.isFinite(v) || v < 0) v = 0;
+        } else if (key === 'check_in' || key === 'check_out') {
+          // Validazione minima formato YYYY-MM-DD
+          if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+            return NextResponse.json(
+              { error: `Formato data non valido per ${key} (atteso YYYY-MM-DD)` },
+              { status: 400 },
+            );
+          }
+        } else if (key === 'airbnb_invoice_ref' || key === 'notes') {
+          v = typeof v === 'string' ? v.trim() : null;
+          if (v === '') v = null;
         }
         args.push(v);
       }

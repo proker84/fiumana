@@ -216,6 +216,13 @@ export default function InvoiceDetailPage() {
   const [sending, setSending] = useState(false);
   const [polling, setPolling] = useState(false);
 
+  // Editing inline della bozza (descrizione + prezzo riga, aliquota IVA)
+  const [editingDraft, setEditingDraft] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [editItems, setEditItems] = useState<
+    Array<{ rigaNumero: number; descrizione: string; prezzoEur: string; aliquotaIva: string }>
+  >([]);
+
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -234,6 +241,73 @@ export default function InvoiceDetailPage() {
       setMessage({ type: 'error', text: e.message });
     } finally {
       setLoading(false);
+    }
+  }
+
+  function enterEdit() {
+    if (!invoice) return;
+    setEditItems(
+      invoice.items.map((it) => ({
+        rigaNumero: it.rigaNumero,
+        descrizione: it.descrizione,
+        prezzoEur: (it.imponibileCents / 100).toFixed(2),
+        aliquotaIva: it.aliquotaIva.toFixed(2),
+      })),
+    );
+    setEditingDraft(true);
+  }
+
+  function cancelEdit() {
+    setEditingDraft(false);
+    setEditItems([]);
+  }
+
+  async function saveDraft() {
+    if (!invoice) return;
+    setSavingDraft(true);
+    setMessage(null);
+    try {
+      // Ricalcolo client-side: imponibile, IVA, totale per ogni riga + totali documento
+      const items = editItems.map((it) => {
+        const imponibile = Math.round(Number(it.prezzoEur || '0') * 100);
+        const aliquota = Number(it.aliquotaIva || '10');
+        const iva = Math.round((imponibile * aliquota) / 100);
+        const totale = imponibile + iva;
+        return {
+          rigaNumero: it.rigaNumero,
+          descrizione: it.descrizione,
+          quantita: 1,
+          prezzoUnitarioCents: imponibile,
+          imponibileCents: imponibile,
+          aliquotaIva: aliquota,
+          ivaCents: iva,
+          totaleCents: totale,
+        };
+      });
+      const sumImp = items.reduce((s, x) => s + x.imponibileCents, 0);
+      const sumIva = items.reduce((s, x) => s + x.ivaCents, 0);
+      const sumTot = items.reduce((s, x) => s + x.totaleCents, 0);
+      const aliquotaInv = items[0]?.aliquotaIva ?? invoice.aliquotaIva;
+
+      const body = {
+        items,
+        imponibileCents: sumImp,
+        ivaCents: sumIva,
+        totaleCents: sumTot,
+        aliquotaIva: aliquotaInv,
+      };
+
+      await apiFetch(`/api/invoices/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      });
+      setMessage({ type: 'success', text: 'Bozza aggiornata.' });
+      setEditingDraft(false);
+      void load();
+    } catch (e: any) {
+      setMessage({ type: 'error', text: e.message ?? 'Errore salvataggio' });
+    } finally {
+      setSavingDraft(false);
     }
   }
 
@@ -522,43 +596,140 @@ export default function InvoiceDetailPage() {
 
           {/* Righe */}
           <div className="admin-card mb-6 p-0 overflow-hidden">
-            <h3 className="font-semibold text-gray-900 px-5 pt-5">Righe</h3>
+            <div className="flex items-center justify-between px-5 pt-5">
+              <h3 className="font-semibold text-gray-900">Righe</h3>
+              {invoice.stato === 'bozza' && !editingDraft && (
+                <button
+                  onClick={enterEdit}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-medium"
+                >
+                  Modifica
+                </button>
+              )}
+              {editingDraft && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={cancelEdit}
+                    disabled={savingDraft}
+                    className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-medium disabled:opacity-50"
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    onClick={saveDraft}
+                    disabled={savingDraft}
+                    className="px-4 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {savingDraft ? 'Salvataggio…' : 'Salva modifiche'}
+                  </button>
+                </div>
+              )}
+            </div>
             <table className="w-full mt-4">
               <thead className="bg-gray-50 border-y border-gray-100">
                 <tr className="text-xs font-medium text-gray-500 uppercase tracking-wider text-left">
                   <th className="px-5 py-2 w-10">#</th>
                   <th className="px-5 py-2">Descrizione</th>
                   <th className="px-5 py-2 text-right">Q.tà</th>
-                  <th className="px-5 py-2 text-right">Prezzo unit.</th>
+                  <th className="px-5 py-2 text-right">Prezzo unit. (imponibile)</th>
                   <th className="px-5 py-2 text-right">IVA %</th>
                   <th className="px-5 py-2 text-right">Imponibile</th>
                   <th className="px-5 py-2 text-right">Totale</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {invoice.items.map((it) => (
-                  <tr key={it.id}>
-                    <td className="px-5 py-3 text-sm text-gray-500">{it.rigaNumero}</td>
-                    <td className="px-5 py-3 text-sm text-gray-900">{it.descrizione}</td>
-                    <td className="px-5 py-3 text-sm text-right text-gray-700">
-                      {it.quantita.toFixed(2)}
-                    </td>
-                    <td className="px-5 py-3 text-sm text-right text-gray-700">
-                      {fmtMoney(it.prezzoUnitarioCents)}
-                    </td>
-                    <td className="px-5 py-3 text-sm text-right text-gray-700">
-                      {it.aliquotaIva.toFixed(2)}%
-                    </td>
-                    <td className="px-5 py-3 text-sm text-right text-gray-700">
-                      {fmtMoney(it.imponibileCents)}
-                    </td>
-                    <td className="px-5 py-3 text-sm text-right font-medium text-gray-900">
-                      {fmtMoney(it.totaleCents)}
-                    </td>
-                  </tr>
-                ))}
+                {editingDraft
+                  ? editItems.map((it, idx) => {
+                      const imp = Math.round(Number(it.prezzoEur || '0') * 100);
+                      const aliquota = Number(it.aliquotaIva || '10');
+                      const iva = Math.round((imp * aliquota) / 100);
+                      const tot = imp + iva;
+                      return (
+                        <tr key={it.rigaNumero} className="bg-amber-50/30">
+                          <td className="px-5 py-3 text-sm text-gray-500">{it.rigaNumero}</td>
+                          <td className="px-5 py-3">
+                            <input
+                              type="text"
+                              value={it.descrizione}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setEditItems((arr) =>
+                                  arr.map((r, i) => (i === idx ? { ...r, descrizione: v } : r)),
+                                );
+                              }}
+                              className="w-full px-2 py-1 rounded border border-gray-200 text-sm focus:border-primary-500 outline-none"
+                            />
+                          </td>
+                          <td className="px-5 py-3 text-sm text-right text-gray-500">1,00</td>
+                          <td className="px-5 py-3">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={it.prezzoEur}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setEditItems((arr) =>
+                                  arr.map((r, i) => (i === idx ? { ...r, prezzoEur: v } : r)),
+                                );
+                              }}
+                              className="w-28 px-2 py-1 rounded border border-gray-200 text-sm text-right font-mono focus:border-primary-500 outline-none"
+                            />
+                          </td>
+                          <td className="px-5 py-3">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                              value={it.aliquotaIva}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setEditItems((arr) =>
+                                  arr.map((r, i) => (i === idx ? { ...r, aliquotaIva: v } : r)),
+                                );
+                              }}
+                              className="w-20 px-2 py-1 rounded border border-gray-200 text-sm text-right font-mono focus:border-primary-500 outline-none"
+                            />
+                          </td>
+                          <td className="px-5 py-3 text-sm text-right text-gray-700 font-mono">
+                            {fmtMoney(imp)}
+                          </td>
+                          <td className="px-5 py-3 text-sm text-right font-medium text-gray-900 font-mono">
+                            {fmtMoney(tot)}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  : invoice.items.map((it) => (
+                      <tr key={it.id}>
+                        <td className="px-5 py-3 text-sm text-gray-500">{it.rigaNumero}</td>
+                        <td className="px-5 py-3 text-sm text-gray-900">{it.descrizione}</td>
+                        <td className="px-5 py-3 text-sm text-right text-gray-700">
+                          {it.quantita.toFixed(2)}
+                        </td>
+                        <td className="px-5 py-3 text-sm text-right text-gray-700">
+                          {fmtMoney(it.prezzoUnitarioCents)}
+                        </td>
+                        <td className="px-5 py-3 text-sm text-right text-gray-700">
+                          {it.aliquotaIva.toFixed(2)}%
+                        </td>
+                        <td className="px-5 py-3 text-sm text-right text-gray-700">
+                          {fmtMoney(it.imponibileCents)}
+                        </td>
+                        <td className="px-5 py-3 text-sm text-right font-medium text-gray-900">
+                          {fmtMoney(it.totaleCents)}
+                        </td>
+                      </tr>
+                    ))}
               </tbody>
             </table>
+            {editingDraft && (
+              <div className="px-5 py-3 bg-amber-50 border-t border-amber-100 text-xs text-amber-800">
+                ⚠️ Stai modificando la bozza. Il "Prezzo unit." è l'<strong>imponibile</strong> (senza IVA).
+                IVA e totale documento sono ricalcolati automaticamente al salvataggio.
+              </div>
+            )}
           </div>
 
           {/* Totali */}
