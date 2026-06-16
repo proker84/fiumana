@@ -498,6 +498,12 @@ Fabio & David
       if (!colNames.has('airbnb_invoice_ref')) {
         await db.execute('ALTER TABLE bookings ADD COLUMN airbnb_invoice_ref TEXT');
       }
+      // Prezzo a notte LORDO IVA pagato dall'ospite (in euro). Inserito a mano:
+      // il payout netto (total_amount) NON permette di ricavarlo. È la base del
+      // calcolo fattura: notti × price_per_night + pulizie, scorporo 10%.
+      if (!colNames.has('price_per_night')) {
+        await db.execute('ALTER TABLE bookings ADD COLUMN price_per_night REAL DEFAULT 0');
+      }
     } catch (e) {
       console.error('Migration bookings columns failed:', e);
     }

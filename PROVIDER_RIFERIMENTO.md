@@ -5,9 +5,14 @@ supportati dal modulo fatturazione di Fiumana. Architettura sender-agnostic
 basata sull'`interface InvoiceSender` (vedi `src/lib/fatturapa/types.ts`).
 
 Provider supportati:
-- **ACube** — implementazione attiva (`src/lib/fatturapa/sender/acube.ts`)
-- **Openapi SDI** — placeholder, da implementare quando arriva la doc reale
+- **Openapi SDI** — **provider attivo in produzione** (`src/lib/fatturapa/sender/openapi.ts`)
+- **ACube** — implementazione alternativa/fallback (`src/lib/fatturapa/sender/acube.ts`)
 - **Mock** — solo dev/test (`src/lib/fatturapa/sender/mock.ts`)
+
+> **Stato (giugno 2026):** tutti e tre i sender sono implementati. La factory
+> (`src/lib/fatturapa/sender/factory.ts`) instrada su Openapi quando
+> `senderProvider = 'openapi'`, su ACube quando `'acube'`, altrimenti Mock.
+> Il default di configurazione è `openapi`.
 
 ---
 
@@ -33,55 +38,65 @@ stato locale) consulta `ACUBE_RIFERIMENTO.md`.
 
 ---
 
-## Openapi SDI — TODO da compilare con doc reale
+## Openapi SDI — provider attivo (IMPLEMENTATO)
 
-> Sezione placeholder — sarà popolata appena ricevuta la documentazione
-> ufficiale Openapi SDI.
+> Implementato in `src/lib/fatturapa/sender/openapi.ts` (classe `OpenapiSender`)
+> e instradato dalla factory nel `case 'openapi'`. È il provider di default.
 
-### Endpoint (presunti, da verificare)
+### Endpoint
 
-- **Sandbox:** `https://test.invoice.openapi.com`
-- **Produzione:** `https://invoice.openapi.com`
+- **SDI sandbox:** `https://test.sdi.openapi.it`
+- **SDI produzione:** `https://sdi.openapi.it`
+- **OAuth sandbox:** `https://test.oauth.openapi.it`
+- **OAuth produzione:** `https://oauth.openapi.it`
+
+L'endpoint OAuth è derivato automaticamente dal pattern dell'endpoint SDI
+(`sdi.` → `oauth.`); `settings.senderEndpoint` sovrascrive il default SDI.
 
 ### Autenticazione
 
-- TODO: verificare se username + password (come ACube) oppure API key fissa
-- Env vars previste: `OPENAPI_USERNAME`, `OPENAPI_API_KEY`,
-  `OPENAPI_API_BASE_URL`
-- Nel DB: `sender_api_key_encrypted` mantiene il formato `email:password`
-  cifrato AES-256-GCM (stesso schema di ACube), per non toccare la crypto
+Due modalità (in ordine di priorità nel codice):
+
+1. **Token statico** — `OPENAPI_TOKEN` (env) oppure valore cifrato nel DB con
+   prefisso `token:`. Cache 1 anno. Modalità preferita.
+2. **Basic auth → POST /token** — `OPENAPI_USERNAME` + `OPENAPI_API_KEY` (env)
+   oppure DB cifrato nel formato `email:apikey` (AES-256-GCM). Genera un bearer
+   con TTL 30 giorni richiedendo gli scope SDI necessari (vedi `REQUIRED_SCOPES`).
+
+Env vars: `OPENAPI_TOKEN`, `OPENAPI_USERNAME`, `OPENAPI_API_KEY`,
+`OPENAPI_API_BASE_URL`.
 
 ### Invio fattura
 
-- TODO: endpoint (presumibilmente `POST /invoice` o simile)
-- TODO: formato body — JSON FatturaPA o multipart con XML allegato?
-- Il payload-builder di Fiumana produce JSON snake_case AdE; verificare
-  compatibilità o necessità di conversione XML
+- Endpoint: **`POST /invoices_legal_storage`** (default, conservazione 10 anni
+  inclusa) oppure `POST /invoices` (opt-out via `conservazioneProvider='none'`).
+  Auto-fallback fra i due in caso di HTTP 412.
+- Formato body: **`application/xml`** (NON JSON). Il payload-builder produce JSON
+  snake_case AdE che `jsonToFatturaPaXml` serializza in XML FatturaPA con tag
+  PascalCase e namespace ufficiale. `enrichForFatturaPaSchema` inietta
+  `id_trasmittente`, `progressivo_invio` e `formato_trasmissione` (che Openapi,
+  a differenza di ACube, non auto-compila).
+- Numerazione: client-side (Openapi non auto-numera lato server).
+- Risposta: `{ data: { uuid }, success: true }`.
 
 ### Polling stato / Webhook
 
-- TODO: endpoint stato (`GET /invoice/{id}`?)
-- TODO: formato webhook (campi, firma, autenticazione)
-- TODO: mapping stati Openapi → `AcubeMarking` interno
-  (`waiting | quarantena | sent | invoice-error`)
-- TODO: mapping esiti SDI (`RC | MC | NS | NE | EC | DT | AT`)
+- Stato: `GET /invoices/{uuid}` → `{ data: { marking, notifications, notice, ... } }`.
+- Ricevuta XML: `GET /invoices/{uuid}` con `Accept: application/xml` (non esiste
+  un endpoint `/file` dedicato come ACube).
+- Webhook body: `{ event, data: { invoice | notification | ... } }`. Eventi
+  gestiti: `customer-notification`, `customer-invoice`, `supplier-invoice`,
+  `invoice-status-quarantena`, `invoice-status-invoice-error`.
+- Mapping stati Openapi → marking interno via `mapOpenapiMarking`
+  (`waiting | delivered | not-delivered | rejected | ...` →
+  `waiting | quarantena | sent | invoice-error` + outcome SDI
+  `RC | MC | NS | NE | DT | AT`).
 
 ### Pricing
 
-- Pay-per-use: **0,06 €/fattura** inclusa conservazione decennale
-- Per ~40 fatture/anno di Fiumana: ~2,40 €/anno (vs 600 € ACube)
-
-### Implementazione
-
-- File da creare: `src/lib/fatturapa/sender/openapi.ts`
-- Classe: `OpenapiSender implements InvoiceSender`
-- Metodi richiesti dal contratto:
-  - `send(payload, ctx)`
-  - `getStatus(externalId)`
-  - `downloadReceipt(externalId)`
-  - `parseWebhook(headers, body)`
-- Una volta pronto, in `factory.ts` sostituire il placeholder MockSender
-  con `new OpenapiSender(settings)` nel `case 'openapi'`.
+- Pay-per-use: invio **~0,015–0,07 €/fattura** + conservazione decennale
+  **~0,035 €/fattura**. Nessun canone fisso, nessun setup.
+- Per ~40 fatture/anno di Fiumana: pochi euro/anno (vs ~600 €/anno ACube).
 
 ---
 

@@ -60,6 +60,7 @@ export async function PATCH(
       city_tax_amount: 'city_tax_amount',
       airbnb_commission: 'airbnb_commission',
       total_amount: 'total_amount',
+      price_per_night: 'price_per_night',
       check_in: 'check_in',
       check_out: 'check_out',
       airbnb_invoice_ref: 'airbnb_invoice_ref',
@@ -72,7 +73,12 @@ export async function PATCH(
       if (key in body) {
         sets.push(`${col} = ?`);
         let v = body[key];
-        if (key === 'city_tax_amount' || key === 'airbnb_commission' || key === 'total_amount') {
+        if (
+          key === 'city_tax_amount' ||
+          key === 'airbnb_commission' ||
+          key === 'total_amount' ||
+          key === 'price_per_night'
+        ) {
           v = Number(v);
           if (!Number.isFinite(v) || v < 0) v = 0;
         } else if (key === 'check_in' || key === 'check_out') {

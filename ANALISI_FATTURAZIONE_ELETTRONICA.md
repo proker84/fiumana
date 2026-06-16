@@ -6,6 +6,34 @@
 
 ---
 
+> ## ⚠️ AGGIORNAMENTO STATO — giugno 2026
+>
+> **Questo documento descrive l'analisi di fattibilità INIZIALE (28 apr 2026),
+> quando il modulo fatturazione non esisteva ancora. È ormai SUPERATO: il modulo
+> è stato implementato per intero ed è in produzione.**
+>
+> Stato reale del codice oggi:
+> - Tabelle DB create (`invoices`, `invoice_items`, `customers`,
+>   `invoice_settings`, `invoice_sdi_logs`) in `src/lib/db.ts`.
+> - Modulo `src/lib/fatturapa/` completo: payload-builder, calculator,
+>   numerazione progressiva atomica (sezionali `AIR` / `AIR-NC`), crypto
+>   AES-256-GCM, state-machine, db-mapper, customer-mapper.
+> - Tre sender implementati: **Openapi SDI (attivo)**, **ACube (fallback)**,
+>   **Mock (test)** — architettura sender-agnostic via `interface InvoiceSender`.
+> - API routes complete sotto `src/app/api/invoices/` (lista, dettaglio,
+>   from-booking, send, poll, webhook, customers, settings).
+> - UI admin sotto `src/app/admin/fatturazione/`.
+> - 4 fatture emesse in precedenza via Krossbooking già migrate nel sistema
+>   (`scripts/link-krossbooking-invoices.ts`).
+>
+> Il canale realmente adottato è **Openapi SDI** (≈ pochi €/anno, conservazione
+> decennale inclusa), non l'upload manuale né la PEC. Le sezioni 3–6 qui sotto
+> restano utili come ragionamento storico sulle alternative, ma non riflettono
+> più lo stato del codice. Per i dettagli tecnici aggiornati del provider vedi
+> `PROVIDER_RIFERIMENTO.md`.
+
+---
+
 ## 1. Stato attuale del progetto
 
 Il backend è già strutturato come gestionale per affitti brevi e attualmente copre tre macro-aree:

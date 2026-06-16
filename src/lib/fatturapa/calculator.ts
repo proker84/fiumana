@@ -102,8 +102,90 @@ export function calcLordoFromImponibile(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Booking → totale fatturabile (scomputo city tax)
+// Arrotondamento ai 5 centesimi
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Arrotonda un importo in centesimi al multiplo di 5 cent più vicino (± 0,05 €).
+ * Es: 29999 → 30000 · 30002 → 30000 · 30003 → 30005 · 99478 → 99480.
+ * Copre la regola "se finisce in ,01 o ,99 → ,00".
+ */
+export function roundTo5Cents(cents: number): number {
+  return Math.round(cents / 5) * 5;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fattura affitto breve = prezzo a notte × notti + pulizie (modello Fiumana)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Pulizie fisse di default: 60,00 € (6000 cent). */
+export const DEFAULT_CLEANING_FEE_CENTS = 6000;
+
+export interface NightlyInvoiceInput {
+  /** Prezzo a notte LORDO IVA pagato dall'ospite, in centesimi (es. 8000 = 80,00 €). */
+  pricePerNightCents: number;
+  /** Numero di notti del soggiorno. */
+  nights: number;
+  /** Pulizie in centesimi. Default 6000 (60,00 €). */
+  cleaningFeeCents?: number;
+}
+
+export interface NightlyInvoiceCalc {
+  pricePerNightCents: number;
+  nights: number;
+  cleaningFeeCents: number;
+  alloggioCents: number; // prezzo × notti (prima dell'arrotondamento)
+  totaleGrezzoCents: number; // alloggio + pulizie (prima dell'arrotondamento)
+  totaleLordoCents: number; // arrotondato ai 5 cent → base dello scorporo IVA
+  split: ImponibileSplit; // imponibile + iva sul totaleLordo
+}
+
+/**
+ * Calcolo fattura affitto breve secondo il modello Fiumana (validato giu 2026):
+ *
+ *   totale_lordo = round5cent( prezzo_a_notte × notti + pulizie )
+ *   imponibile   = round(totale_lordo / 1.10)
+ *   iva          = totale_lordo − imponibile
+ *
+ * NON usa total_amount (payout netto Airbnb), che non è invertibile al prezzo a
+ * notte reale. La tassa di soggiorno e la commissione Airbnb sono ESCLUSE: la
+ * prima è remessa da Airbnb al Comune, la seconda non è oggetto della fattura.
+ *
+ * Esempio Nikolas (80 €/notte × 3 + 60 pulizie):
+ *   computeNightlyInvoice({ pricePerNightCents: 8000, nights: 3 }, 10)
+ *   → totaleLordoCents=30000, imponibile=27273, iva=2727
+ */
+export function computeNightlyInvoice(
+  input: NightlyInvoiceInput,
+  aliquotaIva = 10,
+): NightlyInvoiceCalc {
+  const nights = Math.max(0, Math.floor(input.nights));
+  const pricePerNightCents = Math.max(0, Math.round(input.pricePerNightCents));
+  const cleaningFeeCents = Math.max(
+    0,
+    Math.round(input.cleaningFeeCents ?? DEFAULT_CLEANING_FEE_CENTS),
+  );
+  const alloggioCents = pricePerNightCents * nights;
+  const totaleGrezzoCents = alloggioCents + cleaningFeeCents;
+  const totaleLordoCents = roundTo5Cents(totaleGrezzoCents);
+  const split = splitTotaleLordoIVA(totaleLordoCents, aliquotaIva);
+  return {
+    pricePerNightCents,
+    nights,
+    cleaningFeeCents,
+    alloggioCents,
+    totaleGrezzoCents,
+    totaleLordoCents,
+    split,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Booking → totale fatturabile (scomputo city tax) — ⚠️ LEGACY/DEPRECATO
+// ─────────────────────────────────────────────────────────────────────────────
+// Basato su total_amount (payout netto) + stima commissione 18%: produce importi
+// imprecisi. La generazione fattura usa ora computeNightlyInvoice. Conservato
+// solo per retrocompatibilità.
 
 export interface BookingForInvoice {
   totalAmount: number; // euro (lordo, totale ospite)

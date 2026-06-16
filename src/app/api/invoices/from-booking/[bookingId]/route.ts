@@ -4,7 +4,8 @@
  * Crea una bozza fattura pre-compilata a partire da una prenotazione esistente:
  *   - Recupera il booking e il guest principale (progressivo=1)
  *   - Crea/riusa un Customer derivato dal guest
- *   - Calcola imponibile/IVA con `computeBookingInvoice`
+ *   - Calcola imponibile/IVA con `computeNightlyInvoice`
+ *     (notti × prezzo a notte + pulizie, arrotondamento 5 cent, scorporo 10%)
  *   - Inserisce la fattura in stato 'bozza' con una riga descrittiva
  *
  * Body opzionale:
@@ -13,14 +14,19 @@
  *     "dataPagamento": "2026-04-18",   // default: check_in
  *     "modalitaPagamento": "MP08",     // default: MP08 (carta)
  *     "aliquotaIva": 10,               // default: 10
- *     "cityTaxOverride": 4.00          // override euro tassa di soggiorno
+ *     "pricePerNight": 80.00,          // override prezzo a notte (euro)
+ *     "cleaningFee": 60.00             // override pulizie (euro, default 60)
  *   }
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/auth';
 import { dbExecute, dbQuery, dbQueryOne } from '@/lib/db';
-import { computeBookingInvoice } from '@/lib/fatturapa/calculator';
+import {
+  computeNightlyInvoice,
+  eurosToCents,
+  DEFAULT_CLEANING_FEE_CENTS,
+} from '@/lib/fatturapa/calculator';
 import {
   codiceDestinatarioFor,
   guestToCustomerInput,
@@ -117,63 +123,74 @@ export async function POST(
     const settingsRow = await dbQueryOne('SELECT * FROM invoice_settings WHERE id = 1');
     const settings = rowToInvoiceSettings(settingsRow);
 
-    // Calcolo imponibile
-    const totalAmount = Number((booking as any).total_amount ?? 0);
-    const cityTaxOverride =
-      typeof body.cityTaxOverride === 'number' ? body.cityTaxOverride : undefined;
-    const cityTaxFromBooking = Number((booking as any).city_tax_amount ?? 0);
-
-    // Fallback: se la booking non ha tassa di soggiorno salvata (city_tax_amount
-    // = 0 o null), calcoliamo il default automatico così la fattura tiene
-    // sempre conto della city tax.
-    //   Formula Comacchio Lido di Pomposa: 0,50 € × num_guests × min(notti, 14)
-    let cityTax = cityTaxOverride ?? cityTaxFromBooking;
-    if (cityTax === 0 && cityTaxOverride === undefined) {
-      const numGuests = Math.max(1, Number((booking as any).num_guests ?? 1));
-      const checkIn = (booking as any).check_in;
-      const checkOut = (booking as any).check_out;
-      if (checkIn && checkOut) {
-        const ms = new Date(checkOut).getTime() - new Date(checkIn).getTime();
-        const nights = Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24)));
-        const ratePerCents = settings?.tassaSoggiornoDefaultCents ?? 50;
-        const billable = Math.min(14, Math.max(1, nights));
-        cityTax = (numGuests * billable * ratePerCents) / 100; // cents → euro
-      }
+    // ── Calcolo imponibile (modello: notti × prezzo a notte + pulizie) ──────
+    // Il prezzo a notte è quello LORDO pagato dall'ospite (es. 80 €/notte).
+    // NON si ricava da total_amount (payout netto Airbnb): va inserito a mano
+    // sulla prenotazione, oppure passato nel body come override.
+    const checkIn = (booking as any).check_in;
+    const checkOut = (booking as any).check_out;
+    const nights =
+      checkIn && checkOut
+        ? Math.max(
+            0,
+            Math.round(
+              (new Date(checkOut).getTime() - new Date(checkIn).getTime()) /
+                (1000 * 60 * 60 * 24),
+            ),
+          )
+        : 0;
+    if (nights <= 0) {
+      return NextResponse.json(
+        { error: 'Numero notti non valido: controlla check-in e check-out.' },
+        { status: 400 },
+      );
     }
 
-    // Commissione Airbnb: la formula della fattura è total_amount + commission.
-    // Se l'admin non l'ha inserita (campo airbnb_commission = 0/null nel DB),
-    // la STIMIAMO al 18% del Guadagni (markup medio Airbnb 2026 in Italia,
-    // calibrato su Yana: 52,70/287,30 ≈ 18,3%). È solo una stima — l'admin
-    // dovrebbe sempre verificare con la fattura passiva Airbnb mensile e
-    // aggiornarla manualmente per avere precisione fiscale.
-    let airbnbCommission = Number((booking as any).airbnb_commission ?? 0);
-    let commissionEstimated = false;
-    if (airbnbCommission === 0 && totalAmount > 0) {
-      const ESTIMATED_COMMISSION_RATE = 0.18; // 18% markup su Guadagni
-      airbnbCommission = Number((totalAmount * ESTIMATED_COMMISSION_RATE).toFixed(2));
-      commissionEstimated = true;
+    const pricePerNightEur =
+      typeof body.pricePerNight === 'number'
+        ? body.pricePerNight
+        : Number((booking as any).price_per_night ?? 0);
+    if (!Number.isFinite(pricePerNightEur) || pricePerNightEur <= 0) {
+      return NextResponse.json(
+        {
+          error:
+            'Prezzo a notte mancante. Inseriscilo nella scheda prenotazione ' +
+            '(campo "Prezzo a notte") prima di generare la fattura.',
+        },
+        { status: 400 },
+      );
     }
+
+    const cleaningFeeCents =
+      typeof body.cleaningFee === 'number'
+        ? eurosToCents(body.cleaningFee)
+        : DEFAULT_CLEANING_FEE_CENTS;
 
     const aliquotaIva = Number(body.aliquotaIva ?? 10);
 
-    const calc = computeBookingInvoice(
-      { totalAmount, cityTaxAmount: cityTax, airbnbCommission },
+    const calc = computeNightlyInvoice(
+      {
+        pricePerNightCents: eurosToCents(pricePerNightEur),
+        nights,
+        cleaningFeeCents,
+      },
       aliquotaIva,
     );
 
-    if (calc.totaleFatturaCents <= 0) {
+    if (calc.totaleLordoCents <= 0) {
       return NextResponse.json(
-        { error: 'Totale fattura calcolato è zero. Verifica importo prenotazione.' },
+        { error: 'Totale fattura calcolato è zero. Verifica prezzo a notte e notti.' },
         { status: 400 },
       );
     }
 
     // Descrizione riga
     const propName = property ? (property as any).nome : 'soggiorno';
-    const checkIn = (booking as any).check_in;
-    const checkOut = (booking as any).check_out;
-    const descrizione = `Affitto ${propName} dal ${checkIn} al ${checkOut}`;
+    const prezzoNotteStr = (calc.pricePerNightCents / 100).toFixed(2);
+    const pulizieStr = (calc.cleaningFeeCents / 100).toFixed(2);
+    const descrizione =
+      `Affitto ${propName} dal ${checkIn} al ${checkOut} ` +
+      `(${calc.nights} notti × ${prezzoNotteStr} € + pulizie ${pulizieStr} €)`;
 
     const dataDocumento =
       typeof body.dataDocumento === 'string'
@@ -200,9 +217,9 @@ export async function POST(
         calc.split.ivaCents,
         calc.split.totaleCents,
         aliquotaIva,
-        calc.totaleOspiteCents,
-        calc.cityTaxCents,
-        calc.airbnbCommissionCents,
+        calc.totaleLordoCents, // booking_total_cents = totale lordo fattura
+        null, // city_tax_cents: esclusa dal modello
+        null, // airbnb_commission_cents: esclusa dal modello
         body.modalitaPagamento ?? 'MP08',
         dataPagamento,
         auth.userId,
@@ -234,13 +251,14 @@ export async function POST(
         success: true,
         invoice: rowToInvoice(created),
         breakdown: {
-          totaleOspiteCents: calc.totaleOspiteCents,
-          cityTaxCents: calc.cityTaxCents,
-          airbnbCommissionCents: calc.airbnbCommissionCents,
-          totaleFatturaCents: calc.totaleFatturaCents,
+          pricePerNightCents: calc.pricePerNightCents,
+          nights: calc.nights,
+          alloggioCents: calc.alloggioCents,
+          cleaningFeeCents: calc.cleaningFeeCents,
+          totaleGrezzoCents: calc.totaleGrezzoCents,
+          totaleLordoCents: calc.totaleLordoCents, // arrotondato ai 5 cent
           imponibileCents: calc.split.imponibileCents,
           ivaCents: calc.split.ivaCents,
-          commissionEstimated, // true se la commissione era 0 e l'abbiamo stimata 18%
         },
       },
       { status: 201 },
