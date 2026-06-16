@@ -967,7 +967,7 @@ export default function BookingDetailPage() {
             <div>
               <h3 className="font-semibold text-gray-900">Fatturazione elettronica</h3>
               <p className="text-sm text-gray-500">
-                Inserisci il prezzo a notte pagato dall&apos;ospite, poi crea la bozza fattura
+                Calcolo automatico dal payout Airbnb (commissione 15,5%). Crea la bozza fattura.
               </p>
             </div>
           </div>
@@ -976,20 +976,20 @@ export default function BookingDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-wider">
-                Prezzo a notte (€)
+                Prezzo a notte (€) — opzionale
               </label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
-                placeholder="es. 80.00"
+                placeholder="auto dal payout"
                 value={pricePerNightInput}
                 onChange={(e) => setPricePerNightInput(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none font-mono text-sm"
               />
               <p className="text-xs text-gray-400 mt-1">
-                Prezzo LORDO a notte pagato dall&apos;ospite su Airbnb (es. 80 €). NON il payout
-                netto: quello non è invertibile al prezzo reale.
+                Lascia vuoto: il totale si ricava da solo dal payout (÷ 0,845). Compila solo per
+                forzare un prezzo a notte diverso da quello calcolato.
               </p>
             </div>
 
@@ -1016,6 +1016,7 @@ export default function BookingDetailPage() {
               </div>
               {(() => {
                 const CLEANING = 60;
+                const HOST_FEE = 0.155; // commissione host Airbnb
                 const nights =
                   booking.check_in && booking.check_out
                     ? Math.max(
@@ -1027,18 +1028,23 @@ export default function BookingDetailPage() {
                         ),
                       )
                     : 0;
-                const prezzoNotte = Number(pricePerNightInput || 0);
-                const alloggio = prezzoNotte * nights;
-                const grezzo = alloggio + CLEANING;
-                // Arrotondamento ai 5 cent più vicini (± 0,05 €)
+                const manualPrice = Number(pricePerNightInput || 0);
+                const useManual = manualPrice > 0;
+                const payout = Number(booking.total_amount || 0);
+                // Default: totale dal payout ÷ 0,845. Override: prezzo a notte manuale.
+                const grezzo = useManual ? manualPrice * nights + CLEANING : payout / (1 - HOST_FEE);
+                // Arrotondamento ai 5 cent SOLO sul totale finale
                 const lordo = (Math.round((grezzo * 100) / 5) * 5) / 100;
+                const perNight = nights > 0 ? (lordo - CLEANING) / nights : 0;
                 const imponibile = lordo / 1.1;
                 const iva = lordo - imponibile;
-                const arrotondato = Math.abs(lordo - grezzo) > 0.0001;
-                if (prezzoNotte <= 0 || nights <= 0) {
+                const arrotondato = Math.abs(lordo - grezzo) > 0.005;
+                if (nights <= 0 || (!useManual && payout <= 0)) {
                   return (
                     <p className="text-gray-500">
-                      Inserisci il prezzo a notte per vedere l&apos;anteprima.
+                      {payout <= 0
+                        ? 'Payout Airbnb mancante: inserisci un prezzo a notte manuale.'
+                        : 'Date non valide.'}
                     </p>
                   );
                 }
@@ -1046,9 +1052,9 @@ export default function BookingDetailPage() {
                   <>
                     <div className="flex justify-between text-gray-700">
                       <span>
-                        {prezzoNotte.toFixed(2)} € × {nights} notti
+                        {perNight.toFixed(2)} € × {nights} notti
                       </span>
-                      <span className="font-mono">{alloggio.toFixed(2)} €</span>
+                      <span className="font-mono">{(perNight * nights).toFixed(2)} €</span>
                     </div>
                     <div className="flex justify-between text-gray-700">
                       <span>+ pulizie</span>
@@ -1068,6 +1074,11 @@ export default function BookingDetailPage() {
                       <span className="font-mono">
                         {imponibile.toFixed(2)} + {iva.toFixed(2)}
                       </span>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1.5 pt-1.5 border-t border-primary-100">
+                      {useManual
+                        ? 'Prezzo a notte forzato manualmente.'
+                        : `Da payout ${payout.toFixed(2)} € ÷ 0,845 (commissione 15,5%).`}
                     </div>
                   </>
                 );

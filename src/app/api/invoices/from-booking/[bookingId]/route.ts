@@ -24,6 +24,7 @@ import { authenticateRequest } from '@/lib/auth';
 import { dbExecute, dbQuery, dbQueryOne } from '@/lib/db';
 import {
   computeNightlyInvoice,
+  computeInvoiceFromPayout,
   eurosToCents,
   DEFAULT_CLEANING_FEE_CENTS,
 } from '@/lib/fatturapa/calculator';
@@ -123,10 +124,11 @@ export async function POST(
     const settingsRow = await dbQueryOne('SELECT * FROM invoice_settings WHERE id = 1');
     const settings = rowToInvoiceSettings(settingsRow);
 
-    // ── Calcolo imponibile (modello: notti × prezzo a notte + pulizie) ──────
-    // Il prezzo a notte è quello LORDO pagato dall'ospite (es. 80 €/notte).
-    // NON si ricava da total_amount (payout netto Airbnb): va inserito a mano
-    // sulla prenotazione, oppure passato nel body come override.
+    // ── Calcolo imponibile ──────────────────────────────────────────────────
+    // DEFAULT (automatico): deriva il totale fattura dal payout netto Airbnb,
+    //   scorporando la commissione host 15,5%:  totale = total_amount ÷ 0,845.
+    // OVERRIDE (manuale): se è impostato un prezzo a notte (body.pricePerNight o
+    //   booking.price_per_night > 0) si usa  notti × prezzo + pulizie.
     const checkIn = (booking as any).check_in;
     const checkOut = (booking as any).check_out;
     const nights =
@@ -146,51 +148,67 @@ export async function POST(
       );
     }
 
-    const pricePerNightEur =
-      typeof body.pricePerNight === 'number'
-        ? body.pricePerNight
-        : Number((booking as any).price_per_night ?? 0);
-    if (!Number.isFinite(pricePerNightEur) || pricePerNightEur <= 0) {
-      return NextResponse.json(
-        {
-          error:
-            'Prezzo a notte mancante. Inseriscilo nella scheda prenotazione ' +
-            '(campo "Prezzo a notte") prima di generare la fattura.',
-        },
-        { status: 400 },
-      );
-    }
-
     const cleaningFeeCents =
       typeof body.cleaningFee === 'number'
         ? eurosToCents(body.cleaningFee)
         : DEFAULT_CLEANING_FEE_CENTS;
-
     const aliquotaIva = Number(body.aliquotaIva ?? 10);
 
-    const calc = computeNightlyInvoice(
-      {
-        pricePerNightCents: eurosToCents(pricePerNightEur),
-        nights,
-        cleaningFeeCents,
-      },
-      aliquotaIva,
-    );
+    const pricePerNightEur =
+      typeof body.pricePerNight === 'number'
+        ? body.pricePerNight
+        : Number((booking as any).price_per_night ?? 0);
+    const hasManualPrice = Number.isFinite(pricePerNightEur) && pricePerNightEur > 0;
 
-    if (calc.totaleLordoCents <= 0) {
+    let totaleLordoCents: number;
+    let split: { imponibileCents: number; ivaCents: number; totaleCents: number; aliquotaIva: number };
+    let impliedPerNightCents: number;
+    let metodo: 'payout' | 'prezzo_notte';
+
+    if (hasManualPrice) {
+      const calc = computeNightlyInvoice(
+        { pricePerNightCents: eurosToCents(pricePerNightEur), nights, cleaningFeeCents },
+        aliquotaIva,
+      );
+      totaleLordoCents = calc.totaleLordoCents;
+      split = calc.split;
+      impliedPerNightCents = calc.pricePerNightCents;
+      metodo = 'prezzo_notte';
+    } else {
+      // Default automatico: dal payout netto Airbnb.
+      const totalAmount = Number((booking as any).total_amount ?? 0);
+      if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+        return NextResponse.json(
+          {
+            error:
+              'Payout Airbnb (total_amount) mancante: impossibile calcolare la fattura. ' +
+              'Inserisci il prezzo a notte a mano oppure aggiorna il totale prenotazione.',
+          },
+          { status: 400 },
+        );
+      }
+      const calc = computeInvoiceFromPayout(eurosToCents(totalAmount), aliquotaIva);
+      totaleLordoCents = calc.totaleLordoCents;
+      split = calc.split;
+      // prezzo a notte implicito = (lordo − pulizie) / notti (può non essere tondo)
+      impliedPerNightCents = Math.round((calc.totaleLordoCents - cleaningFeeCents) / nights);
+      metodo = 'payout';
+    }
+
+    if (totaleLordoCents <= 0) {
       return NextResponse.json(
-        { error: 'Totale fattura calcolato è zero. Verifica prezzo a notte e notti.' },
+        { error: 'Totale fattura calcolato è zero. Verifica payout/prezzo a notte e notti.' },
         { status: 400 },
       );
     }
 
     // Descrizione riga
     const propName = property ? (property as any).nome : 'soggiorno';
-    const prezzoNotteStr = (calc.pricePerNightCents / 100).toFixed(2);
-    const pulizieStr = (calc.cleaningFeeCents / 100).toFixed(2);
+    const prezzoNotteStr = (impliedPerNightCents / 100).toFixed(2);
+    const pulizieStr = (cleaningFeeCents / 100).toFixed(2);
     const descrizione =
       `Affitto ${propName} dal ${checkIn} al ${checkOut} ` +
-      `(${calc.nights} notti × ${prezzoNotteStr} € + pulizie ${pulizieStr} €)`;
+      `(${nights} notti × ${prezzoNotteStr} € + pulizie ${pulizieStr} €)`;
 
     const dataDocumento =
       typeof body.dataDocumento === 'string'
@@ -213,11 +231,11 @@ export async function POST(
         dataDocumento,
         bookingId,
         Number((customerRow as any).id),
-        calc.split.imponibileCents,
-        calc.split.ivaCents,
-        calc.split.totaleCents,
+        split.imponibileCents,
+        split.ivaCents,
+        split.totaleCents,
         aliquotaIva,
-        calc.totaleLordoCents, // booking_total_cents = totale lordo fattura
+        totaleLordoCents, // booking_total_cents = totale lordo fattura
         null, // city_tax_cents: esclusa dal modello
         null, // airbnb_commission_cents: esclusa dal modello
         body.modalitaPagamento ?? 'MP08',
@@ -237,11 +255,11 @@ export async function POST(
       [
         invoiceId,
         descrizione,
-        calc.split.imponibileCents,
+        split.imponibileCents,
         aliquotaIva,
-        calc.split.imponibileCents,
-        calc.split.ivaCents,
-        calc.split.totaleCents,
+        split.imponibileCents,
+        split.ivaCents,
+        split.totaleCents,
       ],
     );
 
@@ -251,14 +269,13 @@ export async function POST(
         success: true,
         invoice: rowToInvoice(created),
         breakdown: {
-          pricePerNightCents: calc.pricePerNightCents,
-          nights: calc.nights,
-          alloggioCents: calc.alloggioCents,
-          cleaningFeeCents: calc.cleaningFeeCents,
-          totaleGrezzoCents: calc.totaleGrezzoCents,
-          totaleLordoCents: calc.totaleLordoCents, // arrotondato ai 5 cent
-          imponibileCents: calc.split.imponibileCents,
-          ivaCents: calc.split.ivaCents,
+          metodo, // 'payout' (auto) | 'prezzo_notte' (override manuale)
+          nights,
+          pricePerNightCents: impliedPerNightCents,
+          cleaningFeeCents,
+          totaleLordoCents, // arrotondato ai 5 cent
+          imponibileCents: split.imponibileCents,
+          ivaCents: split.ivaCents,
         },
       },
       { status: 201 },

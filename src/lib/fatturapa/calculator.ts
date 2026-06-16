@@ -181,6 +181,61 @@ export function computeNightlyInvoice(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Fattura derivata dal payout Airbnb (metodo automatico)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Commissione host Airbnb ("host-only fee"), applicata su (stanza + pulizie).
+ *
+ * ⚠️ UNICO PUNTO in cui è definita: se Airbnb cambia la percentuale, modifica
+ * SOLO questa costante. Verificata giu 2026 su più prenotazioni Fiumana
+ * (Nikolas, Klaudia, Ronja, Ursula, …): costante 15,5%.
+ *
+ * Relazione: payout = (stanza + pulizie) × (1 − 0,155)
+ *         ⇒ totale_lordo (stanza + pulizie) = payout ÷ 0,845
+ * La tassa di soggiorno NON entra nel payout (Airbnb la remette al Comune), per
+ * cui questa formula ricostruisce esattamente il totale fattura IVA inclusa.
+ */
+export const AIRBNB_HOST_FEE_RATE = 0.155;
+
+export interface PayoutInvoiceCalc {
+  payoutCents: number; // total_amount in centesimi (payout netto Airbnb)
+  hostFeeRate: number; // 0.155
+  totaleGrezzoCents: number; // payout ÷ 0,845 (prima dell'arrotondamento)
+  totaleLordoCents: number; // arrotondato ai 5 cent → base dello scorporo IVA
+  split: ImponibileSplit; // imponibile + iva sul totaleLordo
+}
+
+/**
+ * Ricostruisce il totale fattura (stanza + pulizie, IVA inclusa) dal payout
+ * netto Airbnb, scorporando la commissione host del 15,5%.
+ *
+ *   totale_lordo = round5cent( payout ÷ (1 − 0,155) )
+ *   imponibile   = round(totale_lordo / 1.10)
+ *   iva          = totale_lordo − imponibile
+ *
+ * Esempio Nikolas: payout 253,50 € → 253,50 ÷ 0,845 = 300,00 €
+ *   computeInvoiceFromPayout(25350, 10)
+ *   → totaleLordoCents=30000, imponibile=27273, iva=2727
+ */
+export function computeInvoiceFromPayout(
+  payoutCents: number,
+  aliquotaIva = 10,
+): PayoutInvoiceCalc {
+  const payout = Math.max(0, Math.round(payoutCents));
+  const totaleGrezzoCents = Math.round(payout / (1 - AIRBNB_HOST_FEE_RATE));
+  const totaleLordoCents = roundTo5Cents(totaleGrezzoCents);
+  const split = splitTotaleLordoIVA(totaleLordoCents, aliquotaIva);
+  return {
+    payoutCents: payout,
+    hostFeeRate: AIRBNB_HOST_FEE_RATE,
+    totaleGrezzoCents,
+    totaleLordoCents,
+    split,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Booking → totale fatturabile (scomputo city tax) — ⚠️ LEGACY/DEPRECATO
 // ─────────────────────────────────────────────────────────────────────────────
 // Basato su total_amount (payout netto) + stima commissione 18%: produce importi
