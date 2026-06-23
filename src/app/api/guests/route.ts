@@ -58,6 +58,26 @@ export async function POST(req: NextRequest) {
       (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)
     );
 
+    // I customers generati dalle fatture puntano al guest via source_guest_id
+    // (vincolo FOREIGN KEY). Se cancellassimo i guests senza prima sganciarli,
+    // la DELETE fallirebbe con "FOREIGN KEY constraint failed". Quindi:
+    //   1. memorizziamo quali customers erano collegati a questa prenotazione
+    //   2. azzeriamo temporaneamente il loro source_guest_id
+    //   3. (dopo il reinserimento) li ricolleghiamo al nuovo guest principale
+    const linkedCustomers = await dbQuery(
+      `SELECT c.id FROM customers c
+         JOIN guests g ON c.source_guest_id = g.id
+        WHERE g.booking_id = ?`,
+      [booking.id],
+    );
+    if (linkedCustomers.length > 0) {
+      await dbExecute(
+        `UPDATE customers SET source_guest_id = NULL
+          WHERE source_guest_id IN (SELECT id FROM guests WHERE booking_id = ?)`,
+        [booking.id],
+      );
+    }
+
     // Delete existing guests for this booking (allow re-submission)
     await dbExecute('DELETE FROM guests WHERE booking_id = ?', [booking.id]);
 
@@ -114,6 +134,24 @@ export async function POST(req: NextRequest) {
           cf,
         ]
       );
+    }
+
+    // Ricollega i customers (sganciati sopra) al nuovo guest principale
+    // (progressivo 1), così il legame fattura↔ospite resta intatto e non si
+    // creano anagrafiche duplicate alla prossima fattura.
+    if (linkedCustomers.length > 0) {
+      const newMain = await dbQueryOne(
+        'SELECT id FROM guests WHERE booking_id = ? ORDER BY progressivo ASC LIMIT 1',
+        [booking.id],
+      );
+      if (newMain?.id) {
+        for (const c of linkedCustomers as any[]) {
+          await dbExecute('UPDATE customers SET source_guest_id = ? WHERE id = ?', [
+            newMain.id,
+            c.id,
+          ]);
+        }
+      }
     }
 
     // Update booking status and clear any correction note
