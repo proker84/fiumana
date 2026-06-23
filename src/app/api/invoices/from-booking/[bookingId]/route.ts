@@ -31,6 +31,7 @@ import {
 import {
   codiceDestinatarioFor,
   guestToCustomerInput,
+  nazioneIstatToIso,
 } from '@/lib/fatturapa/customer-mapper';
 import { rowToInvoice, rowToInvoiceSettings } from '@/lib/fatturapa/db-mapper';
 
@@ -118,6 +119,35 @@ export async function POST(
       );
       const newId = Number((insert as any).lastInsertRowid ?? 0);
       customerRow = await dbQueryOne('SELECT * FROM customers WHERE id = ?', [newId]);
+    } else {
+      // Customer già esistente: riallinea la nazionalità se la residenza del
+      // guest è stata corretta DOPO la creazione del cliente (caso tipico: il
+      // customer era stato salvato come italiano, poi l'ospite ha indicato una
+      // residenza estera nel form). Senza questo, il cliente resterebbe
+      // 'IT/non-estero' e l'invio al SDI verrebbe bloccato chiedendo un CF
+      // italiano che lo straniero non ha.
+      //
+      // Promuoviamo SOLO da italiano→estero (mai il contrario), per non
+      // sovrascrivere eventuali correzioni manuali fatte sul cliente.
+      const guestEstero =
+        !!mainGuest.stato_residenza && String(mainGuest.stato_residenza) !== '100000100';
+      const customerItaliano =
+        String((customerRow as any).nazione ?? 'IT').toUpperCase() === 'IT' ||
+        String((customerRow as any).is_estero ?? 0) === '0' ||
+        (customerRow as any).is_estero === 0;
+      if (guestEstero && customerItaliano) {
+        const isoEstero = nazioneIstatToIso(mainGuest.stato_residenza) ?? 'EE';
+        await dbExecute(
+          `UPDATE customers
+              SET nazione = ?, is_estero = 1, codice_destinatario = 'XXXXXXX',
+                  provincia = 'EE'
+            WHERE id = ?`,
+          [isoEstero, (customerRow as any).id],
+        );
+        customerRow = await dbQueryOne('SELECT * FROM customers WHERE id = ?', [
+          (customerRow as any).id,
+        ]);
+      }
     }
 
     // Settings (per default sequenziale + tassa soggiorno)
