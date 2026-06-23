@@ -72,7 +72,7 @@ const TYPO_REPLACEMENTS: Array<[RegExp, string]> = [
  * - Rimuove qualsiasi carattere fuori dal range Basic Latin + Latin-1
  * - Compatta gli spazi multipli
  */
-export function sanitizeText(input: string | null | undefined): string {
+export function sanitizeText(input: string | null | undefined, maxLen?: number): string {
   if (!input) return '';
   let s = String(input);
   for (const [re, sub] of TYPO_REPLACEMENTS) s = s.replace(re, sub);
@@ -80,6 +80,9 @@ export function sanitizeText(input: string | null | undefined): string {
   s = s.replace(/[^ -~¡-¬®-ÿ]/g, '');
   // Spazi multipli → singolo
   s = s.replace(/\s+/g, ' ').trim();
+  // FatturaPA impone lunghezze massime su molti campi (es. Indirizzo/Comune = 60):
+  // tronchiamo per evitare lo scarto "This value is too long".
+  if (maxLen && s.length > maxLen) s = s.slice(0, maxLen).trim();
   return s;
 }
 
@@ -121,9 +124,9 @@ interface SedePayload {
 
 function buildCedente(s: InvoiceSettings): CedentePayload {
   const sede: SedePayload = {
-    indirizzo: sanitizeText(s.indirizzo),
+    indirizzo: sanitizeText(s.indirizzo, 60),
     cap: s.cap,
-    comune: sanitizeText(s.comune),
+    comune: sanitizeText(s.comune, 60),
     provincia: s.provincia,
     nazione: s.nazione,
   };
@@ -181,9 +184,9 @@ interface CessionarioPayload {
 
 function buildCessionario(c: Customer): CessionarioPayload {
   const sede: SedePayload = {
-    indirizzo: sanitizeText(c.indirizzo ?? c.comune ?? 'N/D'),
-    cap: c.cap ?? '00000',
-    comune: sanitizeText(c.comune ?? 'N/D'),
+    indirizzo: sanitizeText(c.indirizzo ?? c.comune ?? 'N/D', 60),
+    cap: (c.cap ?? '00000').replace(/\s/g, '').slice(0, 5).padStart(5, '0'),
+    comune: sanitizeText(c.comune ?? 'N/D', 60),
     provincia: c.provincia ?? (c.isEstero ? 'EE' : ''),
     nazione: c.nazione ?? 'IT',
   };
