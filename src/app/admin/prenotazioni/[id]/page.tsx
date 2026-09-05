@@ -62,6 +62,8 @@ interface Booking {
   city_tax_amount?: number | null;
   airbnb_commission?: number | null;
   airbnb_invoice_ref?: string | null;
+  notes?: string | null;
+  cancelled?: number | null;
 }
 
 // Calcolo default tassa di soggiorno: 0,50 € × num_guests × clamp(notti, 1, 14)
@@ -182,6 +184,11 @@ export default function BookingDetailPage() {
   const [checkOutInput, setCheckOutInput] = useState<string>('');
   const [totalAmountInput, setTotalAmountInput] = useState<string>('');
   const [airbnbInvoiceRefInput, setAirbnbInvoiceRefInput] = useState<string>('');
+  const [guestNameInput, setGuestNameInput] = useState<string>('');
+  const [guestEmailInput, setGuestEmailInput] = useState<string>('');
+  const [numGuestsInput, setNumGuestsInput] = useState<string>('1');
+  const [notesInput, setNotesInput] = useState<string>('');
+  const [togglingCancelled, setTogglingCancelled] = useState(false);
   const [savingBooking, setSavingBooking] = useState(false);
   const [bookingMessage, setBookingMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [receiptForm, setReceiptForm] = useState({
@@ -235,6 +242,10 @@ export default function BookingDetailPage() {
             : '',
         );
         setAirbnbInvoiceRefInput(data.booking.airbnb_invoice_ref ?? '');
+        setGuestNameInput(data.booking.guest_name ?? '');
+        setGuestEmailInput(data.booking.guest_email ?? '');
+        setNumGuestsInput(String(data.booking.num_guests ?? 1));
+        setNotesInput(data.booking.notes ?? '');
       }
     } catch (err) {
       console.error(err);
@@ -290,6 +301,11 @@ export default function BookingDetailPage() {
       if (totalAmountInput.trim() !== '') body.total_amount = Number(totalAmountInput);
       // airbnb_invoice_ref: accetta anche stringa vuota (per cancellare il valore)
       body.airbnb_invoice_ref = airbnbInvoiceRefInput.trim();
+      if (guestNameInput.trim()) body.guest_name = guestNameInput.trim();
+      body.guest_email = guestEmailInput.trim();
+      const ng = parseInt(numGuestsInput, 10);
+      if (Number.isFinite(ng) && ng >= 1) body.num_guests = ng;
+      body.notes = notesInput;
 
       const res = await fetch(`/api/bookings/${bookingId}`, {
         method: 'PATCH',
@@ -309,6 +325,35 @@ export default function BookingDetailPage() {
       setBookingMessage({ type: 'error', text: err.message ?? 'Errore di connessione' });
     } finally {
       setSavingBooking(false);
+    }
+  }
+
+  // Segna la prenotazione come cancellata (soft delete) o la ripristina
+  async function toggleCancelled() {
+    if (!booking) return;
+    const next = booking.cancelled ? 0 : 1;
+    if (next === 1 && !confirm('Segnare questa prenotazione come cancellata? Resterà consultabile nel filtro "Cancellate".')) return;
+    setTogglingCancelled(true);
+    setBookingMessage(null);
+    try {
+      const token = document.cookie.split('; ').find(c => c.startsWith('auth_token='))?.split('=')[1];
+      const res = await fetch(`/api/bookings/${bookingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ cancelled: next }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setBooking(data.booking);
+        setBookingMessage({ type: 'success', text: next ? 'Prenotazione segnata come cancellata.' : 'Prenotazione ripristinata.' });
+        setTimeout(() => setBookingMessage(null), 2500);
+      } else {
+        setBookingMessage({ type: 'error', text: data.error ?? 'Errore' });
+      }
+    } catch (err: any) {
+      setBookingMessage({ type: 'error', text: err.message ?? 'Errore di connessione' });
+    } finally {
+      setTogglingCancelled(false);
     }
   }
 
@@ -648,12 +693,25 @@ export default function BookingDetailPage() {
             Dati prenotazione
           </h2>
           {!editingBooking ? (
-            <button
-              onClick={() => setEditingBooking(true)}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-medium"
-            >
-              Modifica
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={toggleCancelled}
+                disabled={togglingCancelled}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-medium disabled:opacity-50 ${
+                  booking.cancelled
+                    ? 'border-green-200 text-green-700 hover:bg-green-50'
+                    : 'border-red-200 text-red-600 hover:bg-red-50'
+                }`}
+              >
+                {togglingCancelled ? '…' : booking.cancelled ? 'Ripristina' : 'Segna cancellata'}
+              </button>
+              <button
+                onClick={() => setEditingBooking(true)}
+                className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-medium"
+              >
+                Modifica
+              </button>
+            </div>
           ) : (
             <div className="flex gap-2">
               <button
@@ -667,6 +725,10 @@ export default function BookingDetailPage() {
                     booking.total_amount != null ? Number(booking.total_amount).toFixed(2) : '',
                   );
                   setAirbnbInvoiceRefInput(booking.airbnb_invoice_ref ?? '');
+                  setGuestNameInput(booking.guest_name ?? '');
+                  setGuestEmailInput(booking.guest_email ?? '');
+                  setNumGuestsInput(String(booking.num_guests ?? 1));
+                  setNotesInput(booking.notes ?? '');
                 }}
                 className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-medium"
               >
@@ -700,7 +762,68 @@ export default function BookingDetailPage() {
           </div>
         )}
 
+        {!!booking.cancelled && (
+          <div className="rounded-lg p-3 mb-4 text-sm bg-red-50 text-red-700 border border-red-200">
+            Prenotazione segnata come cancellata. Usa "Ripristina" se è stata riattivata.
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+              Nome ospite
+            </label>
+            {editingBooking ? (
+              <input
+                type="text"
+                value={guestNameInput}
+                onChange={(e) => setGuestNameInput(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+              />
+            ) : (
+              <p className="text-gray-900">{booking.guest_name || '—'}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+              Email / contatto
+            </label>
+            {editingBooking ? (
+              <input
+                type="text"
+                value={guestEmailInput}
+                onChange={(e) => setGuestEmailInput(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                placeholder="email o telefono"
+              />
+            ) : (
+              <p className="text-gray-900">
+                {booking.guest_email || <span className="text-gray-400 italic">non inserito</span>}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+              Numero ospiti
+            </label>
+            {editingBooking ? (
+              <input
+                type="number"
+                min={1}
+                value={numGuestsInput}
+                onChange={(e) => setNumGuestsInput(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+              />
+            ) : (
+              <p className="text-gray-900">{booking.num_guests}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+              Codice conferma · Piattaforma
+            </label>
+            <p className="text-gray-900 font-mono">{booking.booking_id} <span className="text-gray-400 font-sans text-sm">· {booking.platform}</span></p>
+          </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
               Check-in
@@ -780,6 +903,24 @@ export default function BookingDetailPage() {
               Riferimento testuale alla fattura passiva ricevuta da Airbnb (numero, data,
               commissione). Solo informativo per riconciliazione contabile col commercialista.
             </p>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+              Note
+            </label>
+            {editingBooking ? (
+              <textarea
+                value={notesInput}
+                onChange={(e) => setNotesInput(e.target.value)}
+                rows={5}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none resize-y"
+                placeholder="Orari, codice accesso, richieste particolari…"
+              />
+            ) : (
+              <p className="text-gray-700 text-sm whitespace-pre-line">
+                {booking.notes || <span className="text-gray-400 italic">nessuna nota</span>}
+              </p>
+            )}
           </div>
         </div>
       </div>

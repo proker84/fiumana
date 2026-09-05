@@ -44,6 +44,8 @@ export async function GET(
  *   - check_in / check_out: date effettive (se l'ospite parte prima)
  *   - airbnb_invoice_ref: riferimento alla fattura passiva Airbnb (testo libero)
  *   - notes
+ *   - guest_name / guest_email / num_guests: anagrafica prenotazione (modifica manuale)
+ *   - cancelled: 0/1 — segna come cancellata (soft delete) o ripristina
  */
 export async function PATCH(
   req: NextRequest,
@@ -65,6 +67,10 @@ export async function PATCH(
       check_out: 'check_out',
       airbnb_invoice_ref: 'airbnb_invoice_ref',
       notes: 'notes',
+      guest_name: 'guest_name',
+      guest_email: 'guest_email',
+      num_guests: 'num_guests',
+      cancelled: 'cancelled',
     };
 
     const sets: string[] = [];
@@ -89,9 +95,21 @@ export async function PATCH(
               { status: 400 },
             );
           }
-        } else if (key === 'airbnb_invoice_ref' || key === 'notes') {
+        } else if (key === 'airbnb_invoice_ref' || key === 'notes' || key === 'guest_email') {
           v = typeof v === 'string' ? v.trim() : null;
           if (v === '') v = null;
+        } else if (key === 'guest_name') {
+          v = typeof v === 'string' ? v.trim() : '';
+          if (!v) {
+            return NextResponse.json({ error: 'Il nome ospite non può essere vuoto' }, { status: 400 });
+          }
+        } else if (key === 'num_guests') {
+          v = parseInt(String(v), 10);
+          if (!Number.isFinite(v) || v < 1) {
+            return NextResponse.json({ error: 'Numero ospiti non valido (minimo 1)' }, { status: 400 });
+          }
+        } else if (key === 'cancelled') {
+          v = v === true || v === 1 || v === '1' ? 1 : 0;
         }
         args.push(v);
       }
@@ -99,6 +117,19 @@ export async function PATCH(
 
     if (sets.length === 0) {
       return NextResponse.json({ error: 'Nessun campo da aggiornare' }, { status: 400 });
+    }
+
+    // Coerenza date: confronta con i valori già salvati se ne cambia una sola
+    if ('check_in' in body || 'check_out' in body) {
+      const current = await dbQueryOne('SELECT check_in, check_out FROM bookings WHERE id = ?', [params.id]);
+      const ci = 'check_in' in body ? body.check_in : current?.check_in;
+      const co = 'check_out' in body ? body.check_out : current?.check_out;
+      if (ci && co && String(co) <= String(ci)) {
+        return NextResponse.json(
+          { error: 'Il check-out deve essere successivo al check-in' },
+          { status: 400 },
+        );
+      }
     }
 
     sets.push('updated_at = CURRENT_TIMESTAMP');
