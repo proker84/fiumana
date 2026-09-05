@@ -22,6 +22,7 @@ import {
   Loader2,
   MapPin,
   FileText,
+  Plus,
 } from 'lucide-react';
 
 interface Booking {
@@ -221,13 +222,22 @@ export default function PrenotazioniPage() {
             Gestisci prenotazioni, link ospiti e invii Alloggiati
           </p>
         </div>
-        <button
-          onClick={fetchBookings}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-600 border border-primary-200 rounded-xl hover:bg-primary-50 transition-colors"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Aggiorna
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchBookings}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-600 border border-primary-200 rounded-xl hover:bg-primary-50 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Aggiorna
+          </button>
+          <Link
+            href="/admin/prenotazioni/nuova"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Nuova prenotazione
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}

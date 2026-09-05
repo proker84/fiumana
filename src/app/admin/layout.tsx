@@ -18,6 +18,7 @@ import {
   Brush,
   Receipt,
   Mail,
+  PlusCircle,
 } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -67,6 +68,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navItems = [
     { href: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
     { href: '/admin/prenotazioni', icon: CalendarDays, label: 'Prenotazioni' },
+    { href: '/admin/prenotazioni/nuova', icon: PlusCircle, label: 'Nuova prenotazione' },
     { href: '/admin/pulizie', icon: Brush, label: 'Pulizie' },
     { href: '/admin/fatturazione', icon: Receipt, label: 'Fatturazione' },
     { href: '/admin/richieste', icon: MessageSquare, label: 'Richieste' },

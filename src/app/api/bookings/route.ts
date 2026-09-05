@@ -112,34 +112,63 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
+    // Validazione minima: codice, nome, date YYYY-MM-DD con check-out > check-in
+    const bookingId = String(body.booking_id || '').trim().toUpperCase();
+    const guestName = String(body.guest_name || '').trim();
+    const checkIn = String(body.check_in || '').trim();
+    const checkOut = String(body.check_out || '').trim();
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    if (!bookingId) {
+      return NextResponse.json({ error: 'Codice di conferma mancante' }, { status: 400 });
+    }
+    if (!guestName) {
+      return NextResponse.json({ error: 'Nome ospite mancante' }, { status: 400 });
+    }
+    if (!dateRe.test(checkIn) || !dateRe.test(checkOut)) {
+      return NextResponse.json({ error: 'Date non valide (atteso YYYY-MM-DD)' }, { status: 400 });
+    }
+    if (checkOut <= checkIn) {
+      return NextResponse.json({ error: 'Il check-out deve essere successivo al check-in' }, { status: 400 });
+    }
+    const numGuests = Math.max(1, parseInt(String(body.num_guests ?? 1), 10) || 1);
+    let totalAmount: number | null = null;
+    if (body.total_amount !== undefined && body.total_amount !== null && body.total_amount !== '') {
+      const n = Number(body.total_amount);
+      totalAmount = Number.isFinite(n) && n >= 0 ? n : null;
+    }
+    const notes = typeof body.notes === 'string' && body.notes.trim() ? body.notes.trim() : null;
+    const guestEmail = typeof body.guest_email === 'string' && body.guest_email.trim() ? body.guest_email.trim() : null;
+
     const { v4: uuidv4 } = require('uuid');
     const guestToken = uuidv4();
 
     const result = await dbExecute(
-      `INSERT INTO bookings (booking_id, guest_token, guest_name, guest_email, check_in, check_out, num_guests, total_amount, platform, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO bookings (booking_id, guest_token, guest_name, guest_email, check_in, check_out, num_guests, total_amount, platform, status, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        body.booking_id,
+        bookingId,
         guestToken,
-        body.guest_name,
-        body.guest_email || null,
-        body.check_in,
-        body.check_out,
-        body.num_guests || 1,
-        body.total_amount || null,
+        guestName,
+        guestEmail,
+        checkIn,
+        checkOut,
+        numGuests,
+        totalAmount,
         body.platform || 'airbnb',
         'confirmed',
+        notes,
       ]
     );
 
     return NextResponse.json({
-      id: result.lastInsertRowid,
+      id: Number(result.lastInsertRowid),
+      booking_id: bookingId,
       guest_token: guestToken,
       message: 'Prenotazione creata',
     });
   } catch (error: any) {
     if (error.message?.includes('UNIQUE constraint')) {
-      return NextResponse.json({ error: 'Prenotazione già esistente' }, { status: 409 });
+      return NextResponse.json({ error: 'Prenotazione già esistente con questo codice di conferma' }, { status: 409 });
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
