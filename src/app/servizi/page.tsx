@@ -51,7 +51,7 @@ export default function ServiziPage() {
     {
       icon: Sparkles,
       title: 'Home Staging e Fotografia',
-      desc: 'Trasformiamo il tuo immobile con allestimenti professionali e servizi fotografici che aumentano fino al 40% il tasso di prenotazione.',
+      desc: 'Trasformiamo il tuo immobile con allestimenti professionali e servizi fotografici che rendono l\'annuncio più attraente e aumentano le prenotazioni.',
       features: ['Interior design', 'Fotografia HDR', 'Virtual tour 360°', 'Styling stagionale'],
     },
     {

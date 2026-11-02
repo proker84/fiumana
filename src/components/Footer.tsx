@@ -6,10 +6,10 @@ import {
   Mail,
   Clock,
   ArrowRight,
-  Instagram,
-  Facebook,
   Award,
+  Star,
 } from 'lucide-react';
+import { AIRBNB_URL } from '@/lib/site';
 
 export default function Footer() {
   return (
@@ -147,24 +147,16 @@ export default function Footer() {
                 <span className="text-white/60 text-sm">Lun - Ven: 9:00 - 18:00</span>
               </li>
             </ul>
-            <div className="flex gap-4 mt-6">
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-gold-500 transition-colors"
-              >
-                <Instagram className="w-5 h-5" />
-              </a>
-              <a
-                href="https://facebook.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-gold-500 transition-colors"
-              >
-                <Facebook className="w-5 h-5" />
-              </a>
-            </div>
+            <a
+              href={AIRBNB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 mt-6 text-white/60 text-sm hover:text-gold-400 transition-colors"
+            >
+              <Star className="w-4 h-4 text-gold-400" />
+              Leggi le nostre recensioni su Airbnb
+            </a>
+            {/* Icone Instagram/Facebook: da riattivare quando le pagine saranno create */}
           </div>
         </div>
       </div>
@@ -191,6 +183,11 @@ export default function Footer() {
           <div className="text-center text-white/30 text-xs">
             Immobiliare Fiumana S.r.l. | P.IVA/C.F. 01340960481 | REA: PO-480791 | Via del Seminario, 79 - 59100 Prato (PO)
           </div>
+          <p className="text-center text-white/30 text-xs mt-3 max-w-3xl mx-auto leading-relaxed">
+            Immobiliare Fiumana S.r.l. non è un&apos;agenzia immobiliare e non svolge attività di mediazione
+            o intermediazione immobiliare (L. 39/1989). I servizi offerti riguardano esclusivamente la
+            gestione di immobili destinati alle locazioni brevi per conto dei proprietari.
+          </p>
         </div>
       </div>
     </footer>

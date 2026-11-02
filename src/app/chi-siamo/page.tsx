@@ -10,7 +10,10 @@ import {
   MapPin,
   Award,
   TrendingUp,
+  ExternalLink,
+  Star,
 } from 'lucide-react';
+import { AIRBNB_URL } from '@/lib/site';
 import { useEffect, useRef } from 'react';
 
 function useReveal() {
@@ -48,15 +51,14 @@ export default function ChiSiamoPage() {
     {
       icon: Award,
       title: 'Eccellenza',
-      desc: 'Puntiamo alla perfezione nell\'ospitalità, con rating medio superiore a 4.9.',
+      desc: 'Puntiamo alla perfezione nell\'ospitalità, curando ogni dettaglio del soggiorno.',
     },
   ];
 
   const milestones = [
-    { year: '2020', title: 'Fondazione', desc: 'Nasce Immobiliare Fiumana con focus su compravendita e immobili commerciali.' },
-    { year: '2023', title: 'Affitti Brevi', desc: 'Iniziamo la specializzazione nella gestione di immobili per affitti brevi.' },
-    { year: '2024', title: 'Crescita', desc: 'Raggiungiamo i primi 10 immobili gestiti in Emilia-Romagna.' },
-    { year: '2025', title: 'Innovazione', desc: 'Lanciamo la formula Affitto Garantito e la piattaforma digitale per proprietari.' },
+    { year: '1965', title: 'Fondazione', desc: 'Nasce Immobiliare Fiumana: acquistiamo e gestiamo immobili di proprietà.' },
+    { year: '2020', title: 'Rinnovamento', desc: 'La società si rinnova e rilancia la propria attività immobiliare.' },
+    { year: '2025', title: 'Affitti Brevi', desc: 'Accanto alla locazione a lungo termine, iniziamo a gestire i nostri immobili come affitti brevi.' },
   ];
 
   return (
@@ -74,8 +76,8 @@ export default function ChiSiamoPage() {
             </span>
           </h1>
           <p className="text-white/70 text-lg max-w-2xl mx-auto">
-            Immobiliare Fiumana è una realtà consolidata nel settore immobiliare italiano,
-            specializzata dal 2023 nella gestione professionale di immobili per affitti brevi.
+            Immobiliare Fiumana è nel settore immobiliare dal 1965: acquistiamo e gestiamo
+            immobili per locazioni a lungo e breve termine.
           </p>
         </div>
       </section>
@@ -94,15 +96,15 @@ export default function ChiSiamoPage() {
               </h2>
               <div className="space-y-4 text-gray-600 leading-relaxed">
                 <p>
-                  Immobiliare Fiumana nasce come agenzia immobiliare con un solido portafoglio di immobili
-                  commerciali e residenziali in Italia. Nel corso degli anni abbiamo costruito una
-                  rete di competenze e relazioni che ci permette di offrire un servizio a 360 gradi.
+                  Immobiliare Fiumana nasce nel 1965 come società che acquista e gestisce immobili
+                  di proprietà, destinati alla locazione. Non siamo un&apos;agenzia e non facciamo
+                  mediazione: gli immobili li conosciamo perché li possediamo e li gestiamo in prima persona.
                 </p>
                 <p>
-                  Dal 2023, rispondendo alla crescente domanda del mercato, ci siamo specializzati nella
-                  gestione di immobili per affitti brevi. La nostra esperienza nel settore immobiliare,
-                  unita a competenze digitali e di hospitality, ci ha permesso di creare un modello
-                  di gestione unico e altamente performante.
+                  Nel 2020 la società si è rinnovata e dal 2025, accanto alla locazione a lungo termine,
+                  gestisce i propri immobili anche come affitti brevi. L&apos;esperienza maturata
+                  sul campo, unita a strumenti digitali e attenzione all&apos;ospitalità, è la base
+                  del servizio che oggi offriamo anche ad altri proprietari.
                 </p>
                 <p>
                   Oggi offriamo un ventaglio completo di soluzioni: dalla gestione standard alla formula
@@ -115,21 +117,28 @@ export default function ChiSiamoPage() {
               <div className="bg-gradient-to-br from-primary-100 to-gold-50 rounded-3xl p-12 text-center">
                 <Building2 className="w-24 h-24 text-primary-300 mx-auto mb-6" />
                 <div className="grid grid-cols-2 gap-6">
+                  <a
+                    href={AIRBNB_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-white rounded-xl p-4 shadow-sm flex flex-col items-center justify-center hover:shadow-md transition-shadow"
+                  >
+                    <Star className="w-6 h-6 text-gold-500 fill-gold-500 mb-1" />
+                    <div className="text-sm text-gray-500 flex items-center gap-1">
+                      Recensioni Airbnb <ExternalLink className="w-3 h-3" />
+                    </div>
+                  </a>
                   <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="text-2xl font-bold text-primary-600">10+</div>
-                    <div className="text-sm text-gray-500">Immobili Gestiti</div>
+                    <div className="text-2xl font-bold text-gold-500">1965</div>
+                    <div className="text-sm text-gray-500">Fondazione</div>
                   </div>
                   <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="text-2xl font-bold text-gold-500">95%</div>
-                    <div className="text-sm text-gray-500">Tasso Occupazione</div>
+                    <div className="text-2xl font-bold text-primary-600">2020</div>
+                    <div className="text-sm text-gray-500">Rinnovamento</div>
                   </div>
                   <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="text-2xl font-bold text-primary-600">500+</div>
-                    <div className="text-sm text-gray-500">Ospiti Accolti</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="text-2xl font-bold text-gold-500">4.8</div>
-                    <div className="text-sm text-gray-500">Rating Medio</div>
+                    <div className="text-lg font-bold text-gold-500">Breve e lungo</div>
+                    <div className="text-sm text-gray-500">Termine</div>
                   </div>
                 </div>
               </div>

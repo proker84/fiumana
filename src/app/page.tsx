@@ -22,7 +22,9 @@ import {
   Maximize,
   MapPin,
   Award,
+  ExternalLink,
 } from 'lucide-react';
+import { AIRBNB_URL } from '@/lib/site';
 
 function useReveal() {
   const ref = useRef<HTMLDivElement>(null);
@@ -48,10 +50,9 @@ export default function HomePage() {
   const contentRef = useReveal();
 
   const stats = [
-    { number: '10+', label: 'Immobili Gestiti' },
-    { number: '95%', label: 'Tasso Occupazione' },
-    { number: '5+', label: 'Anni di Esperienza' },
-    { number: '4.8', label: 'Rating Medio Ospiti' },
+    { number: '1965', label: 'Nel settore immobiliare' },
+    { number: 'Breve e lungo', label: 'Termine' },
+    { number: 'Gratuita', label: 'Valutazione iniziale' },
   ];
 
   const services = [
@@ -118,7 +119,7 @@ export default function HomePage() {
         'Revenue management dinamico',
         'Ottimizzazione prezzi AI',
       ],
-      cta: 'La Più Scelta',
+      cta: 'Scopri di Più',
     },
     {
       name: 'Affitto Garantito',
@@ -132,27 +133,6 @@ export default function HomePage() {
         'Rivalutazione annuale',
       ],
       cta: 'Scopri di Più',
-    },
-  ];
-
-  const testimonials = [
-    {
-      name: 'Marco R.',
-      location: 'Roma',
-      text: 'Ho affidato il mio bilocale a Immobiliare Fiumana e in 6 mesi il rendimento è triplicato rispetto all\'affitto tradizionale.',
-      rating: 5,
-    },
-    {
-      name: 'Giulia T.',
-      location: 'Firenze',
-      text: 'Professionalità incredibile. La formula affitto garantito mi dà serenità totale, ricevo il mio canone ogni mese senza pensieri.',
-      rating: 5,
-    },
-    {
-      name: 'Antonio L.',
-      location: 'Rimini',
-      text: 'Il mio appartamento è sempre occupato e le recensioni degli ospiti sono eccellenti. Consigliatissimi!',
-      rating: 5,
     },
   ];
 
@@ -266,10 +246,21 @@ export default function HomePage() {
                   className="glass-card p-6 text-center transform hover:scale-105 transition-transform duration-300"
                   style={{ animationDelay: `${0.8 + i * 0.15}s` }}
                 >
-                  <div className="text-3xl font-bold text-gold-400 mb-1">{stat.number}</div>
+                  <div className={`${stat.number.length > 6 ? 'text-2xl' : 'text-3xl'} font-bold text-gold-400 mb-1`}>{stat.number}</div>
                   <div className="text-white/60 text-sm">{stat.label}</div>
                 </div>
               ))}
+              <a
+                href={AIRBNB_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="glass-card p-6 text-center transform hover:scale-105 transition-transform duration-300 flex flex-col items-center justify-center"
+              >
+                <Star className="w-7 h-7 text-gold-400 fill-gold-400 mb-2" />
+                <div className="text-white/80 text-sm font-semibold flex items-center gap-1">
+                  Recensioni su Airbnb <ExternalLink className="w-3.5 h-3.5" />
+                </div>
+              </a>
             </div>
           </div>
 
@@ -277,10 +268,14 @@ export default function HomePage() {
           <div className="lg:hidden grid grid-cols-2 gap-3 mt-12 animate-fade-in" style={{ animationDelay: '0.6s' }}>
             {stats.map((stat) => (
               <div key={stat.label} className="glass-card p-4 text-center">
-                <div className="text-2xl font-bold text-gold-400">{stat.number}</div>
+                <div className={`${stat.number.length > 6 ? 'text-lg' : 'text-2xl'} font-bold text-gold-400`}>{stat.number}</div>
                 <div className="text-white/60 text-xs">{stat.label}</div>
               </div>
             ))}
+            <a href={AIRBNB_URL} target="_blank" rel="noopener noreferrer" className="glass-card p-4 text-center flex flex-col items-center justify-center">
+              <Star className="w-5 h-5 text-gold-400 fill-gold-400 mb-1" />
+              <div className="text-white/80 text-xs font-semibold">Recensioni su Airbnb</div>
+            </a>
           </div>
         </div>
 
@@ -457,7 +452,7 @@ export default function HomePage() {
               >
                 {formula.highlight && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-6 py-1 bg-gradient-to-r from-gold-500 to-gold-600 text-white text-sm font-semibold rounded-full">
-                    Più Popolare
+                    Consigliata
                   </div>
                 )}
                 <h3
@@ -500,7 +495,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* === TESTIMONIALS === */}
+      {/* === RECENSIONI AIRBNB === */}
       <section className="section-padding bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -509,50 +504,34 @@ export default function HomePage() {
               <div className="relative rounded-2xl overflow-hidden shadow-2xl">
                 <img
                   src="https://images.unsplash.com/photo-1600607687644-c7171b42498f?auto=format&fit=crop&w=800&q=80"
-                  alt="Interno appartamento di lusso"
+                  alt="Interno appartamento"
                   className="w-full h-[500px] object-cover"
                 />
               </div>
-              <div className="absolute -bottom-6 -right-6 bg-gold-500 text-white p-6 rounded-2xl shadow-xl">
-                <div className="text-4xl font-bold">500+</div>
-                <div className="text-sm opacity-90">Clienti Soddisfatti</div>
-              </div>
             </div>
 
-            {/* Right - Testimonials */}
-            <div>
-              <div className="mb-10 reveal">
-                <span className="text-gold-500 font-semibold text-sm uppercase tracking-widest">
-                  Testimonial
-                </span>
-                <h2 className="text-3xl md:text-4xl font-display font-bold text-gray-900 mt-3">
-                  Cosa dicono i nostri{' '}
-                  <span className="gradient-text">proprietari</span>
-                </h2>
-              </div>
-
-              <div className="space-y-6">
-                {testimonials.map((t, i) => (
-                  <div
-                    key={t.name}
-                    className="reveal bg-gray-50 rounded-xl p-6 border-l-4 border-gold-500"
-                    style={{ transitionDelay: `${i * 0.15}s` }}
-                  >
-                    <p className="text-gray-600 leading-relaxed mb-4 italic">&ldquo;{t.text}&rdquo;</p>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-semibold text-gray-900">{t.name}</div>
-                        <div className="text-sm text-gray-400">{t.location}</div>
-                      </div>
-                      <div className="flex gap-1">
-                        {Array.from({ length: t.rating }).map((_, j) => (
-                          <Star key={j} className="w-4 h-4 text-gold-400 fill-gold-400" />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {/* Right - Link alle recensioni reali */}
+            <div className="reveal">
+              <span className="text-gold-500 font-semibold text-sm uppercase tracking-widest">
+                Recensioni
+              </span>
+              <h2 className="text-3xl md:text-4xl font-display font-bold text-gray-900 mt-3 mb-6">
+                Cosa dicono i nostri{' '}
+                <span className="gradient-text">ospiti</span>
+              </h2>
+              <p className="text-gray-600 leading-relaxed mb-8">
+                Preferiamo far parlare chi ha soggiornato davvero nei nostri immobili.
+                Tutte le recensioni sono pubbliche e verificate direttamente su Airbnb.
+              </p>
+              <a
+                href={AIRBNB_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary text-lg inline-flex items-center"
+              >
+                Leggi le recensioni su Airbnb
+                <ExternalLink className="w-5 h-5 ml-2" />
+              </a>
             </div>
           </div>
         </div>
